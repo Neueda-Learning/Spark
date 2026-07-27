@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portfolio Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        /* ===== Navbar ===== */
+        .navbar {
+            background: #1e293b;
+            color: #fff;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            height: 56px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(0,0,0,.15);
+        }
+        .navbar .brand {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: .5px;
+            margin-right: 40px;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,.6);
+            font-size: 15px;
+            padding: 16px 20px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all .2s;
+        }
+        .tab-btn:hover { color: #fff; }
+        .tab-btn.active {
+            color: #fff;
+            border-bottom-color: #3b82f6;
+        }
+
+        /* ===== Container ===== */
+        .container {
+            max-width: 1200px;
+            margin: 24px auto;
+            padding: 0 20px;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* ===== Cards ===== */
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.08);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .card-title {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1e293b;
+        }
+
+        /* ===== Stat Cards ===== */
+        .stat-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.08);
+            padding: 24px;
+            text-align: center;
+        }
+        .stat-card .label {
+            font-size: 13px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        .stat-card .value {
+            font-size: 30px;
+            font-weight: 700;
+        }
+        .stat-card .sub {
+            font-size: 13px;
+            margin-top: 6px;
+        }
+
+        /* ===== Chart Row ===== */
+        .chart-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .chart-wrapper {
+            position: relative;
+            width: 100%;
+        }
+        .chart-wrapper canvas { width: 100% !important; }
+
+        /* ===== Tables ===== */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        thead th {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 2px solid #e2e8f0;
+            color: #64748b;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+        }
+        tbody td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        tbody tr:nth-child(even) { background: #f9fafb; }
+        tbody tr:hover { background: #f0f4ff; }
+
+        .positive { color: #16a34a; font-weight: 600; }
+        .negative { color: #dc2626; font-weight: 600; }
+
+        /* ===== Buttons ===== */
+        .btn {
+            padding: 6px 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all .15s;
+        }
+        .btn:hover { opacity: .85; }
+        .btn-buy { background: #3b82f6; color: #fff; }
+        .btn-sell { background: #ef4444; color: #fff; }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .btn-group { display: flex; gap: 6px; }
+
+        /* ===== Modal ===== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,.45);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: #fff;
+            border-radius: 14px;
+            padding: 32px;
+            width: 420px;
+            max-width: 90vw;
+            box-shadow: 0 12px 40px rgba(0,0,0,.2);
+        }
+        .modal h3 {
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+        .modal .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 14px;
+        }
+        .modal .info-row .info-label { color: #64748b; }
+        .modal .info-row .info-value { font-weight: 600; }
+        .modal label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin: 16px 0 6px;
+        }
+        .modal input[type="number"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+        }
+        .modal input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+        .modal .estimate {
+            margin-top: 12px;
+            padding: 12px;
+            background: #f0f4ff;
+            border-radius: 8px;
+            font-size: 14px;
+            text-align: center;
+        }
+        .modal .estimate strong { font-size: 18px; }
+        .modal .btn-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 24px;
+        }
+        .modal .btn-row .btn {
+            flex: 1;
+            padding: 10px;
+            font-size: 15px;
+        }
+        .btn-cancel {
+            background: #e2e8f0;
+            color: #475569;
+        }
+        .btn-confirm-buy { background: #3b82f6; color: #fff; }
+        .btn-confirm-sell { background: #ef4444; color: #fff; }
+        .modal .error-msg {
+            color: #dc2626;
+            font-size: 13px;
+            margin-top: 8px;
+            display: none;
+        }
+
+        /* ===== Hover Chart ===== */
+        .hover-chart {
+            display: none;
+            position: fixed;
+            z-index: 150;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,.15);
+            padding: 12px;
+            width: 280px;
+            height: 180px;
+        }
+
+        /* ===== Empty State ===== */
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #94a3b8;
+        }
+        .empty-state .icon { font-size: 40px; margin-bottom: 12px; }
+
+        /* ===== Loading ===== */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #94a3b8;
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 768px) {
+            .stat-row { grid-template-columns: 1fr; }
+            .chart-row { grid-template-columns: 1fr; }
+            .stat-card .value { font-size: 24px; }
+            table { font-size: 12px; }
+            thead th, tbody td { padding: 8px 6px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+    <div class="brand">Portfolio Manager</div>
+    <button class="tab-btn active" data-tab="overview">组合总览</button>
+    <button class="tab-btn" data-tab="operations">投资操作</button>
+</nav>
+
+<div class="container">
+
+    <!-- Tab 1: 组合总览 -->
+    <div id="tab-overview" class="tab-content active">
+        <div class="stat-row">
+            <div class="stat-card">
+                <div class="label">总价值</div>
+                <div class="value" id="stat-total-value">--</div>
+                <div class="sub" id="stat-total-change">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">总盈亏</div>
+                <div class="value" id="stat-total-pnl">--</div>
+                <div class="sub" id="stat-total-return">--</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">现金余额</div>
+                <div class="value" style="color:#3b82f6" id="stat-cash">--</div>
+                <div class="sub" style="color:#94a3b8" id="stat-cash-pct">--</div>
+            </div>
+        </div>
+        <div class="chart-row">
+            <div class="card">
+                <div class="card-title">资产分配</div>
+                <div class="chart-wrapper">
+                    <canvas id="pieChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">每日收益</div>
+                <div class="chart-wrapper">
+                    <canvas id="barLineChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 2: 投资操作 -->
+    <div id="tab-operations" class="tab-content">
+        <!-- Holdings -->
+        <div class="card">
+            <div class="card-title">我的持仓</div>
+            <div id="holdings-content">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+        <!-- Market Stocks -->
+        <div class="card">
+            <div class="card-title">市场标的</div>
+            <div id="stocks-content">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Trade Modal -->
+<div class="modal-overlay" id="tradeModal">
+    <div class="modal">
+        <h3 id="modal-title">买入</h3>
+        <div class="info-row">
+            <span class="info-label">代码</span>
+            <span class="info-value" id="modal-code">--</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">名称</span>
+            <span class="info-value" id="modal-name">--</span>
+        </div>
+        <div class="info-row">
+            <span class="info-label">当前价格</span>
+            <span class="info-value" id="modal-price">--</span>
+        </div>
+        <div id="modal-max-sell-row" style="display:none" class="info-row">
+            <span class="info-label">最大可卖</span>
+            <span class="info-value" id="modal-max-sell">--</span>
+        </div>
+        <label for="modal-qty">数量</label>
+        <input type="number" id="modal-qty" min="1" value="1" placeholder="输入数量">
+        <div class="estimate" id="modal-estimate">预计花费: <strong>$0.00</strong></div>
+        <div class="error-msg" id="modal-error"></div>
+        <div class="btn-row">
+            <button class="btn btn-cancel" id="modal-cancel">取消</button>
+            <button class="btn btn-confirm-buy" id="modal-confirm">确认</button>
+        </div>
+    </div>
+</div>
+
+<!-- Hover Chart -->
+<div class="hover-chart" id="hoverChart">
+    <canvas id="hoverChartCanvas"></canvas>
+</div>
+
+<script>
+/* ================================================================
+   Portfolio Manager – Frontend Logic
+   ================================================================ */
+
+// ---------- State ----------
+let overviewData = null;
+let weeklyData = null;
+let holdingsData = null;
+let stocksData = null;
+const dataLoaded = { overview: false, operations: false };
+
+// ---------- Chart instances ----------
+let pieChartInstance = null;
+let barLineChartInstance = null;
+let hoverChartInstance = null;
+
+// ---------- Helpers ----------
+function fmt(n) {
+    return '$' + Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+function fmtPct(n) {
+    return (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%';
+}
+function pnlClass(n) { return n >= 0 ? 'positive' : 'negative'; }
+
+// ---------- Tab switching ----------
+document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+        if (tab === 'overview' && !dataLoaded.overview) loadOverview();
+        if (tab === 'operations' && !dataLoaded.operations) loadOperations();
+    });
+});
+
+/* ================================================================
+   Tab 1 – 组合总览
+   ================================================================ */
+async function loadOverview(force) {
+    try {
+        const [ovRes, wkRes] = await Promise.all([
+            fetch('/api/portfolio/overview').then(r => r.json()),
+            fetch('/api/portfolio/weekly-performance').then(r => r.json())
+        ]);
+        overviewData = ovRes;
+        weeklyData = wkRes;
+        renderStatCards(); // 用 overviewData 渲染顶部的4个统计卡片（总值/总盈亏/日盈亏/现金）
+        renderPieChart();  // 用 overviewData.allocation 画资产分配饼图
+        renderBarLineChart();   // 用 weeklyData 画7天收益柱状+折线图
+        dataLoaded.overview = true; //标记总览页数据已加载完成
+    } catch (e) {
+        console.error('Failed to load overview:', e);
+    }
+}
+
+function renderStatCards() {
+    const d = overviewData;
+    document.getElementById('stat-total-value').textContent = fmt(d.totalValue);
+    const chg = d.totalProfit || 0;
+    const chgEl = document.getElementById('stat-total-change');
+    chgEl.textContent = (chg >= 0 ? '▲ ' : '▼ ') + fmt(Math.abs(chg));
+    chgEl.className = 'sub ' + pnlClass(chg);
+
+    const pnlEl = document.getElementById('stat-total-pnl');
+    pnlEl.textContent = fmt(d.totalProfit);
+    pnlEl.className = 'value ' + pnlClass(d.totalProfit);
+    const retEl = document.getElementById('stat-total-return');
+    retEl.textContent = fmtPct(d.returnRate);
+    retEl.className = 'sub ' + pnlClass(d.totalProfit);
+
+    document.getElementById('stat-cash').textContent = fmt(d.cashBalance);
+    const cashPct = d.totalValue > 0 ? (d.cashBalance / d.totalValue * 100) : 0;
+    document.getElementById('stat-cash-pct').textContent = '占总价值 ' + cashPct.toFixed(1) + '%';
+}
+
+function renderPieChart() {
+    const d = overviewData;
+    const colorMap = { 'STOCK': '#3b82f6', 'BOND': '#22c55e', 'CASH': '#f97316' };
+    const labels = (d.allocation || []).map(a => a.assetType + '  ' + fmt(a.value));
+    const values = (d.allocation || []).map(a => a.value || 0);
+    const colors = (d.allocation || []).map(a => colorMap[a.assetType] || '#94a3b8');
+    const ctx = document.getElementById('pieChart').getContext('2d');
+    if (pieChartInstance) pieChartInstance.destroy();
+    pieChartInstance = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: labels.map((l, i) => l + '  ' + fmt(values[i])),
+            datasets: [{
+                data: values,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#fff'
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 16, font: { size: 13 } } },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => {
+                            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                            const pct = total > 0 ? (ctx.parsed / total * 100).toFixed(1) : 0;
+                            return ctx.label + '  (' + pct + '%)';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderBarLineChart() {
+    const d = weeklyData;
+    if (!d || !d.length) return;
+    const labels = d.map(r => String(r.date));
+    const pnlData = d.map(r => r.dailyProfit || 0);
+    const retData = d.map(r => r.returnRate || 0);
+    const ctx = document.getElementById('barLineChart').getContext('2d');
+    if (barLineChartInstance) barLineChartInstance.destroy();
+    barLineChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: '每日收益',
+                    data: pnlData,
+                    backgroundColor: pnlData.map(v => v >= 0 ? 'rgba(34,197,94,.6)' : 'rgba(239,68,68,.6)'),
+                    borderRadius: 4,
+                    yAxisID: 'y',
+                    order: 2
+                },
+                {
+                    label: '收益率',
+                    data: retData,
+                    type: 'line',
+                    borderColor: '#8b5cf6',
+                    backgroundColor: 'rgba(139,92,246,.1)',
+                    tension: .3,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#8b5cf6',
+                    yAxisID: 'y1',
+                    order: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+                y: { position: 'left', title: { display: true, text: '收益 ($)' } },
+                y1: {
+                    position: 'right',
+                    title: { display: true, text: '收益率 (%)' },
+                    grid: { drawOnChartArea: false },
+                    ticks: { callback: v => v + '%' }
+                }
+            },
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 16 } }
+            }
+        }
+    });
+}
+
+/* ================================================================
+   Tab 2 – 投资操作
+   ================================================================ */
+async function loadOperations(force) {
+    try {
+        const [hRes, sRes] = await Promise.all([
+            fetch('/api/portfolio/holdings').then(r => r.json()),
+            fetch('/api/stocks').then(r => r.json())
+        ]);
+        holdingsData = hRes;
+        stocksData = sRes;
+        renderHoldings();
+        renderStocks();
+        dataLoaded.operations = true;
+    } catch (e) {
+        console.error('Failed to load operations:', e);
+    }
+}
+
+// ---------- Holdings Table ----------
+function renderHoldings() {
+    const el = document.getElementById('holdings-content');
+    if (!holdingsData || holdingsData.length === 0) {
+        el.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>暂无持仓，去下方买入标的吧！</p></div>';
+        return;
+    }
+    let html = '<table><thead><tr>';
+    html += '<th>代码</th><th>名称</th><th>类型</th><th>数量</th><th>均价</th><th>现价</th><th>盈亏</th><th>盈亏%</th><th>操作</th>';
+    html += '</tr></thead><tbody>';
+    holdingsData.forEach(h => {
+        const cls = pnlClass(h.profit || 0);
+        html += '<tr>';
+        html += '<td><strong>' + h.symbol + '</strong></td>';
+        html += '<td>' + h.name + '</td>';
+        html += '<td>' + (h.assetType || '--') + '</td>';
+        html += '<td>' + h.quantity + '</td>';
+        html += '<td>' + fmt(h.averageCost) + '</td>';
+        html += '<td>' + fmt(h.currentPrice) + '</td>';
+        html += '<td class="' + cls + '">' + fmt(h.profit) + '</td>';
+        html += '<td class="' + cls + '">' + fmtPct(h.profitPercent) + '</td>';
+        html += '<td><div class="btn-group">';
+        html += '<button class="btn btn-buy btn-sm" onclick="openTrade(\'' + h.symbol + '\',' + h.stockId + ',\'BUY\')">买入</button>';
+        html += '<button class="btn btn-sell btn-sm" onclick="openTrade(\'' + h.symbol + '\',' + h.stockId + ',\'SELL\')">卖出</button>';
+        html += '</div></td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+}
+
+// ---------- Stocks Table ----------
+function renderStocks() {
+    const el = document.getElementById('stocks-content');
+    if (!stocksData || stocksData.length === 0) {
+        el.innerHTML = '<div class="empty-state"><p>暂无市场数据</p></div>';
+        return;
+    }
+    let html = '<table><thead><tr>';
+    html += '<th>代码</th><th>名称</th><th>类型</th><th>板块</th><th>现价</th><th>日涨跌</th><th>操作</th>';
+    html += '</tr></thead><tbody>';
+    stocksData.forEach(s => {
+        const chg = s.changePercent || 0;
+        const cls = pnlClass(chg);
+        html += '<tr class="stock-row" data-stock-id="' + s.id + '">';
+        html += '<td><strong>' + s.symbol + '</strong></td>';
+        html += '<td>' + s.name + '</td>';
+        html += '<td>' + (s.assetType || '--') + '</td>';
+        html += '<td>' + (s.sector || '--') + '</td>';
+        html += '<td>' + fmt(s.currentPrice) + '</td>';
+        html += '<td class="' + cls + '">' + fmtPct(chg) + '</td>';
+        html += '<td><button class="btn btn-buy btn-sm" onclick="openTrade(\'' + s.symbol + '\',' + s.id + ',\'BUY\')">买入</button></td>';
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    el.innerHTML = html;
+    attachHoverEvents();
+}
+
+/* ================================================================
+   Hover Chart – 7-day price
+   ================================================================ */
+let hoverTimeout = null;
+
+function attachHoverEvents() {
+    document.querySelectorAll('.stock-row').forEach(row => {
+        row.addEventListener('mouseenter', function (e) {
+            const stockId = this.dataset.stockId;
+            clearTimeout(hoverTimeout);
+            hoverTimeout = setTimeout(() => showHoverChart(stockId, e), 350);
+        });
+        row.addEventListener('mouseleave', () => {
+            clearTimeout(hoverTimeout);
+            hideHoverChart();
+        });
+    });
+}
+
+async function showHoverChart(stockId, event) {
+    const container = document.getElementById('hoverChart');
+    const rect = event.currentTarget.getBoundingClientRect();
+    container.style.display = 'block';
+    container.style.left = (rect.right + 10) + 'px';
+    container.style.top = rect.top + 'px';
+    // Check if fits on right, else show on left
+    if (rect.right + 300 > window.innerWidth) {
+        container.style.left = (rect.left - 290) + 'px';
+    }
+    try {
+        const data = await fetch('/api/stocks/' + stockId + '/prices').then(r => r.json());
+        const ctx = document.getElementById('hoverChartCanvas').getContext('2d');
+        if (hoverChartInstance) hoverChartInstance.destroy();
+        hoverChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.map(d => String(d.date)),
+                datasets: [{
+                    data: data.map(d => d.closePrice),
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59,130,246,.08)',
+                    fill: true,
+                    tension: .3,
+                    pointRadius: 3,
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false }, tooltip: { enabled: true } },
+                scales: {
+                    x: { ticks: { font: { size: 10 } } },
+                    y: { ticks: { font: { size: 10 } } }
+                }
+            }
+        });
+    } catch (e) {
+        container.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px;">暂无数据</p>';
+    }
+}
+
+function hideHoverChart() {
+    const container = document.getElementById('hoverChart');
+    container.style.display = 'none';
+    container.innerHTML = '<canvas id="hoverChartCanvas"></canvas>';
+}
+
+/* ================================================================
+   Trade Modal
+   ================================================================ */
+let modalState = { stockId: null, stockSymbol: null, type: null, price: 0, name: '', code: '', maxQty: 0 };
+
+function openTrade(stockSymbol, stockIdNum, type) {
+    // Find stock info
+    let stock = null;
+    let holding = null;
+    if (stocksData) stock = stocksData.find(s => s.symbol === stockSymbol);
+    if (holdingsData) holding = holdingsData.find(h => h.symbol === stockSymbol);
+
+    const price = stock ? stock.currentPrice : (holding ? holding.currentPrice : 0);
+    const name = stock ? stock.name : (holding ? holding.name : stockSymbol);
+
+    modalState = {
+        stockId: stockIdNum,
+        stockSymbol: stockSymbol,
+        type: type,
+        price: price,
+        name: name,
+        code: stockSymbol,
+        maxQty: holding ? holding.quantity : 0
+    };
+
+    document.getElementById('modal-title').textContent = type === 'BUY' ? '买入 ' + name : '卖出 ' + name;
+    document.getElementById('modal-code').textContent = stockSymbol;
+    document.getElementById('modal-name').textContent = name;
+    document.getElementById('modal-price').textContent = fmt(price);
+    document.getElementById('modal-qty').value = 1;
+    document.getElementById('modal-error').style.display = 'none';
+
+    const maxSellRow = document.getElementById('modal-max-sell-row');
+    const confirmBtn = document.getElementById('modal-confirm');
+    if (type === 'SELL') {
+        maxSellRow.style.display = 'flex';
+        document.getElementById('modal-max-sell').textContent = modalState.maxQty + ' 股';
+        confirmBtn.className = 'btn btn-confirm-sell';
+        confirmBtn.textContent = '确认卖出';
+    } else {
+        maxSellRow.style.display = 'none';
+        confirmBtn.className = 'btn btn-confirm-buy';
+        confirmBtn.textContent = '确认买入';
+    }
+
+    updateEstimate();
+    document.getElementById('tradeModal').classList.add('show');
+}
+
+function updateEstimate() {
+    const qty = parseInt(document.getElementById('modal-qty').value) || 0;
+    const total = qty * modalState.price;
+    const el = document.getElementById('modal-estimate');
+    if (modalState.type === 'BUY') {
+        el.innerHTML = '预计花费: <strong>' + fmt(total) + '</strong>';
+    } else {
+        el.innerHTML = '预计收入: <strong>' + fmt(total) + '</strong>';
+    }
+}
+
+document.getElementById('modal-qty').addEventListener('input', updateEstimate);
+
+document.getElementById('modal-cancel').addEventListener('click', () => {
+    document.getElementById('tradeModal').classList.remove('show');
+});
+
+document.getElementById('tradeModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+        document.getElementById('tradeModal').classList.remove('show');
+    }
+});
+
+document.getElementById('modal-confirm').addEventListener('click', async () => {
+    const qty = parseInt(document.getElementById('modal-qty').value);
+    const errEl = document.getElementById('modal-error');
+    errEl.style.display = 'none';
+
+    if (!qty || qty <= 0) {
+        errEl.textContent = '请输入有效数量';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    if (modalState.type === 'SELL' && qty > modalState.maxQty) {
+        errEl.textContent = '卖出数量不能超过持仓数量 (' + modalState.maxQty + ')';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    try {
+        const resp = await fetch('/api/portfolio/transactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                stockId: modalState.stockId,
+                type: modalState.type,
+                quantity: qty
+            })
+        });
+        if (!resp.ok) {
+            const text = await resp.text();
+            throw new Error(text || '交易失败');
+        }
+        document.getElementById('tradeModal').classList.remove('show');
+        // Refresh data
+        dataLoaded.overview = false;
+        dataLoaded.operations = false;
+        loadOverview();
+        loadOperations();
+    } catch (e) {
+        errEl.textContent = e.message || '请求失败，请重试';
+        errEl.style.display = 'block';
+    }
+});
+
+/* ================================================================
+   Init
+   ================================================================ */
+loadOverview();
+</script>
+</body>
+</html>
