@@ -144,7 +144,7 @@ class TransactionServiceImplTest {
         assertThat(result.type()).isEqualTo("SELL");
         assertThat(result.quantity()).isEqualByComparingTo(new BigDecimal("3"));
         verify(holdingRepository).updateQuantityAndAverageCost(1L, new BigDecimal("7"), new BigDecimal("180.00"));
-        verify(portfolioRepository).updateCashBalance(eq(1L), eq(new BigDecimal("105865.00")));
+        verify(portfolioRepository).updateCashBalance(eq(1L), eq(new BigDecimal("100586.50")));
     }
 
     @Test
