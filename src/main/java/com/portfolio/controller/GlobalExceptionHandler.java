@@ -1,5 +1,7 @@
 package com.portfolio.controller;
 
+import com.portfolio.service.MarketDataUnavailableException;
+import org.springframework.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -42,5 +44,15 @@ public class GlobalExceptionHandler {
         body.put("fields", fieldErrors);
         body.put("timestamp", Instant.now().toString());
         return ResponseEntity.badRequest().body(body);
+    }
+
+    @ExceptionHandler(MarketDataUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handleMarketDataUnavailable(MarketDataUnavailableException ex) {
+        log.warn("Market data unavailable: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of(
+                "error", "Market Data Unavailable",
+                "message", ex.getMessage(),
+                "timestamp", Instant.now().toString()
+        ));
     }
 }

@@ -17,6 +17,35 @@ CREATE TABLE IF NOT EXISTS portfolio (
     created_at   TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS market_price_daily (
+    id              BIGINT         AUTO_INCREMENT PRIMARY KEY,
+    stock_id        BIGINT         NOT NULL,
+    trade_date      DATE           NOT NULL,
+    open_price      DECIMAL(18,6)  NOT NULL,
+    high_price      DECIMAL(18,6)  NOT NULL,
+    low_price       DECIMAL(18,6)  NOT NULL,
+    close_price     DECIMAL(18,6)  NOT NULL,
+    adjusted_close  DECIMAL(18,6),
+    volume          BIGINT         NOT NULL DEFAULT 0,
+    source          VARCHAR(20)    NOT NULL DEFAULT 'YAHOO',
+    fetched_at      TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_market_price_stock
+        FOREIGN KEY (stock_id) REFERENCES stock(id),
+    CONSTRAINT uq_market_price_stock_date
+        UNIQUE (stock_id, trade_date),
+    CONSTRAINT chk_market_price_values CHECK (
+        open_price > 0
+        AND high_price > 0
+        AND low_price > 0
+        AND close_price > 0
+        AND high_price >= open_price
+        AND high_price >= close_price
+        AND low_price <= open_price
+        AND low_price <= close_price
+        AND volume >= 0
+    )
+);
+
 CREATE TABLE IF NOT EXISTS holding (
     id              BIGINT         AUTO_INCREMENT PRIMARY KEY,
     portfolio_id    BIGINT         NOT NULL,
