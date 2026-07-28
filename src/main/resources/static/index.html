@@ -1052,7 +1052,11 @@ function handleAssistantInputKeydown(e) {
 
 function renderAssistantMessages() {
     const box = document.getElementById('assistant-messages');
-    destroyAssistantCharts();
+    if (!box) return;
+    box.querySelectorAll('canvas').forEach(canvas => {
+        const chart = Chart.getChart(canvas);
+        if (chart) chart.destroy();
+    });
     box.innerHTML = assistantHistory
         .map((m, index) => {
             let html = '<div class="assistant-msg ' + m.role + '">';
