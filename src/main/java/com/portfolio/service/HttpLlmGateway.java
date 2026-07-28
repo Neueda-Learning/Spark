@@ -106,8 +106,10 @@ public class HttpLlmGateway implements LlmGateway {
             try (Stream<String> lines = response.body()) {
                 lines.forEach(line -> handleStreamLine(line, chunkConsumer));
             }
-        } catch (IOException | InterruptedException e) {
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            throw new IllegalStateException("Streaming request to provider failed", e);
+        } catch (IOException e) {
             throw new IllegalStateException("Streaming request to provider failed", e);
         }
     }
