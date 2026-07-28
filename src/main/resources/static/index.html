@@ -484,17 +484,23 @@
             <button class="candle-close" id="candle-close" aria-label="关闭">&times;</button>
         </div>
         <div class="candle-interval-tabs" role="tablist" aria-label="K线周期">
-            <button class="candle-interval-tab active" type="button" role="tab"
-                    aria-selected="true" data-interval="DAILY">日线</button>
-            <button class="candle-interval-tab" type="button" role="tab"
-                    aria-selected="false" data-interval="WEEKLY">周线</button>
-            <button class="candle-interval-tab" type="button" role="tab"
-                    aria-selected="false" data-interval="MONTHLY">月线</button>
+            <button class="candle-interval-tab active" id="candle-tab-daily"
+                    type="button" role="tab" aria-controls="candle-panel"
+                    aria-selected="true" tabindex="0" data-interval="DAILY">日线</button>
+            <button class="candle-interval-tab" id="candle-tab-weekly"
+                    type="button" role="tab" aria-controls="candle-panel"
+                    aria-selected="false" tabindex="-1" data-interval="WEEKLY">周线</button>
+            <button class="candle-interval-tab" id="candle-tab-monthly"
+                    type="button" role="tab" aria-controls="candle-panel"
+                    aria-selected="false" tabindex="-1" data-interval="MONTHLY">月线</button>
         </div>
-        <div class="candle-chart-wrap">
+        <div class="candle-chart-wrap" id="candle-panel" role="tabpanel"
+             aria-labelledby="candle-tab-daily" tabindex="0">
             <canvas id="candleCanvas"></canvas>
             <div class="candle-tooltip" id="candleTooltip"></div>
-            <div class="candle-status" id="candle-status">正在加载日 K 数据...</div>
+            <div class="candle-status" id="candle-status" role="status" aria-live="polite">
+                正在加载日 K 数据...
+            </div>
         </div>
     </div>
 </div>
@@ -908,10 +914,15 @@ function closeCandles() {
 }
 
 function setActiveCandleTab(interval) {
+    const panel = document.getElementById('candle-panel');
     document.querySelectorAll('.candle-interval-tab').forEach(button => {
         const active = button.dataset.interval === interval;
         button.classList.toggle('active', active);
         button.setAttribute('aria-selected', String(active));
+        button.tabIndex = active ? 0 : -1;
+        if (active) {
+            panel.setAttribute('aria-labelledby', button.id);
+        }
     });
 }
 
@@ -1050,6 +1061,19 @@ document.querySelectorAll('.candle-interval-tab').forEach(button => {
         if (interval !== candleCurrentInterval) {
             loadCandleSeries(interval);
         }
+    });
+    button.addEventListener('keydown', event => {
+        const tabs = Array.from(document.querySelectorAll('.candle-interval-tab'));
+        const currentIndex = tabs.indexOf(button);
+        let nextIndex = null;
+        if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length;
+        if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        if (event.key === 'Home') nextIndex = 0;
+        if (event.key === 'End') nextIndex = tabs.length - 1;
+        if (nextIndex === null) return;
+        event.preventDefault();
+        tabs[nextIndex].focus();
+        tabs[nextIndex].click();
     });
 });
 
