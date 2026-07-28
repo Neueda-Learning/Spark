@@ -25,7 +25,7 @@ function Layout() {
                 投资操作
               </NavLink>
               <NavLink to="/assistant" className={linkClass}>
-                投资助手
+                Invest Assistant
               </NavLink>
             </div>
           </div>

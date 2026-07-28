@@ -32,12 +32,17 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
     private static final Pattern SYMBOL_PATTERN = Pattern.compile("\\b[A-Z]{1,6}\\b");
 
-        private static final Set<String> MARKET_INTENT_KEYWORDS = Set.of(
-            "推荐", "调仓", "配置", "买", "卖", "加仓", "减仓", "建仓", "选股", "机会", "市场", "行情", "分析", "股票", "投资", "股价", "allocation", "rebalance", "buy", "sell"
-    );
+            private static final Set<String> MARKET_INTENT_KEYWORDS = Set.of(
+                "推荐", "调仓", "配置", "买", "卖", "加仓", "减仓", "建仓", "选股", "机会", "市场", "行情", "分析", "股票", "投资", "股价",
+                "allocation", "rebalance", "rebalancing", "portfolio", "position", "positions", "weight", "weights", "exposure", "risk-on", "risk-off",
+                "buy", "sell", "add", "trim", "reduce", "increase", "entry", "exit", "rotate", "switch", "opportunity", "opportunities", "valuation",
+                "undervalued", "overvalued", "sector", "sectors", "stock", "stocks", "equity", "equities", "market", "price", "prices"
+            );
 
     private static final Set<String> PERFORMANCE_INTENT_KEYWORDS = Set.of(
-            "收益曲线", "曲线", "走势图", "趋势", "预测", "回撤", "盈亏", "performance", "forecast", "trend", "drawdown", "chart", "line"
+                "收益曲线", "曲线", "走势图", "趋势", "预测", "回撤", "盈亏",
+                "performance", "return", "returns", "pnl", "profit", "loss", "gain", "forecast", "projection", "scenario", "trend", "trajectory",
+                "drawdown", "volatility", "risk", "sharpe", "alpha", "beta", "momentum", "backtest", "history", "historical", "chart", "charts", "graph", "line", "curve"
     );
 
     private final AiAssistantRepository aiAssistantRepository;
@@ -87,7 +92,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                 contextPayload.officialDataUsable()
             )
         ));
-        messages.add(new LlmGateway.Message("system", "投资组合上下文（仅供内部参考）：\n" + contextPayload.contextJson()));
+        messages.add(new LlmGateway.Message("system", "Portfolio context (internal reference only):\n" + contextPayload.contextJson()));
 
         if (request.history() != null) {
             int start = Math.max(0, request.history().size() - MAX_HISTORY_MESSAGES);
@@ -140,14 +145,14 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         List<AiAssistantRepository.AvailableStockRow> availableStocks = aiAssistantRepository.findAvailableStocks(portfolioId);
 
             if (heldStocks.isEmpty()) {
-                warnings.add("未读取到持仓记录，可能是账户为空或底层表结构发生变化。");
+                warnings.add("No holdings were read. The account may be empty or underlying table structures may have changed.");
             }
 
             BigDecimal cashBalance = aiAssistantRepository.findPortfolioCashBalance(portfolioId)
                 .map(v -> v.setScale(2, RoundingMode.HALF_UP))
                 .orElse(ZERO_MONEY);
             if (cashBalance.compareTo(ZERO_MONEY) == 0) {
-                warnings.add("现金余额未能稳定识别，当前按 0 处理（不影响持仓推理）。");
+                warnings.add("Cash balance could not be reliably identified and is treated as 0 for this round.");
             }
 
         BigDecimal totalMarketValue = heldStocks.stream()
@@ -203,7 +208,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         if (scope.includePerformanceSeries()) {
             List<AiAssistantRepository.PerformancePointRow> snapshots = aiAssistantRepository.findPerformanceSeries(portfolioId, 14);
             if (snapshots.isEmpty()) {
-                warnings.add("未读取到组合快照序列，预测图将基于当前持仓与价格进行保守推断。");
+                warnings.add("No portfolio snapshot series was found. Forecast charts will be conservatively inferred from current holdings and prices.");
             }
 
             List<Map<String, Object>> performanceSeries = snapshots.stream()
@@ -233,7 +238,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             long unavailableCount = marketInsights.size() - availableCount;
 
             payload.put("official_market_intelligence_note",
-                "该字段可来自 Yahoo 官方行情或系统内部可信行情源。data_status=official_realtime/trusted_internal_feed 均可用于定量分析。"
+                "This field may come from Yahoo official quotes or the internal trusted market feed. data_status=official_realtime/trusted_internal_feed can both be used for quantitative analysis."
             );
             payload.put("official_market_intelligence_quality", Map.of(
                 "requested", marketInsights.size(),
@@ -246,10 +251,10 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             officialDataUsable = availableCount > 0;
 
             if (availableCount == 0) {
-            warnings.add("当前未获取到可用行情源（官方或内部），禁止输出具体收益率数值预测。");
+            warnings.add("No usable market source is currently available (official or internal), so quantitative return-rate forecasts are not allowed.");
             }
         } else {
-            warnings.add("本轮未识别到可用于外部市场数据拉取的标的代码，已仅基于组合上下文分析。");
+            warnings.add("No symbols were identified for external market data in this round; analysis is based only on portfolio context.");
         }
 
         payload.put("context_quality", Map.of(
@@ -272,59 +277,66 @@ public class AiAssistantServiceImpl implements AiAssistantService {
                                          boolean officialDataUsable) {
         String chartInstruction = shouldGenerateCharts
             ? """
-                 5) 当前问题需要可视化：请在自然语言分析后输出图表 JSON。
-               - 先输出一行标记 <<AI_CHARTS_JSON>>
-               - 再输出一个合法 JSON 对象
-                 - 仅输出与问题相关的图表字段，不相关字段不要输出
-                 - 图表数量由问题复杂度决定（可为 1~3 张）
-                 6) 可选图表字段（按需返回）：
+                 5) Visualization is required for this question: after the natural-language analysis, output chart JSON.
+               - First output one marker line: <<AI_CHARTS_JSON>>
+               - Then output one valid JSON object
+                 - Return only chart fields relevant to the question
+                 - Number of charts should depend on complexity (1 to 3)
+                 6) Optional chart fields (return on demand):
                {
-                 \"current_portfolio_forecast\": {\"title\":\"当前持仓预测盈亏\",\"dates\":[...],\"values\":[...]},
-                 \"recommended_portfolio_forecast\": {\"title\":\"建议调仓后预测盈亏\",\"dates\":[...],\"values\":[...]},
-                 \"recommended_allocation\": {\"title\":\"建议持仓占比\",\"labels\":[...],\"values\":[...]},
-                 \"expected_drivers\": {\"title\":\"收益驱动因子\",\"labels\":[...],\"values\":[...]}
+                 \"current_portfolio_forecast\": {\"title\":\"Current Portfolio Forecast Return\",\"dates\":[...],\"values\":[...]},
+                 \"recommended_portfolio_forecast\": {\"title\":\"Recommended Portfolio Forecast Return\",\"dates\":[...],\"values\":[...]},
+                 \"recommended_allocation\": {\"title\":\"Recommended Allocation\",\"labels\":[...],\"values\":[...]},
+                 \"expected_drivers\": {\"title\":\"Expected Return Drivers\",\"labels\":[...],\"values\":[...]}
                }
-            7) 数组长度必须匹配，数值必须是数字，推荐占比之和尽量接近 100。
-            8) 对“预测/评估/趋势/曲线”问题，至少返回一张折线相关图表。
-                9) 预测图时间轴必须严格使用上下文 time_anchor 中的 forecast_window_start 到 forecast_window_end，
-                    并按月递进（例如 2026-08, 2026-09 ... 2027-08），禁止使用历史过时年份。
-                10) 若 official_market_intelligence_quality.usable_count=0，禁止输出具体数值预测图，只能给出定性判断。
+            7) Array lengths must match; all values must be numeric; allocation percentages should sum close to 100.
+            8) For forecast/evaluation/trend/curve questions, return at least one line-chart-related series.
+            9) Forecast chart timeline must strictly follow time_anchor.forecast_window_start to forecast_window_end
+               with monthly increments (for example 2026-08, 2026-09 ... 2027-08). Do not use outdated years.
+            10) If official_market_intelligence_quality.usable_count=0, do not output quantitative forecast charts.
+                Provide qualitative judgment only.
+            11) Language consistency rule: chart JSON textual fields (such as title and labels) must use the same
+                language as the user question and the main response text. Do not mix languages in one answer.
                 """
             : """
-            5) 当前问题不需要可视化：只输出自然语言分析，禁止输出 <<AI_CHARTS_JSON>> 或任意 JSON。
+            5) Visualization is not required for this question: output natural-language analysis only.
+               Do not output <<AI_CHARTS_JSON>> or any JSON.
             """;
 
         String mandatoryInstruction = chartMandatory
-            ? "10) 本次属于预测或评估问题：图表是必需项，禁止只返回纯文字。"
+            ? "10) This is a forecast or evaluation question: charts are required; text-only output is not allowed."
             : "";
 
         String languageInstruction = "zh".equals(responseLanguage)
-            ? "9) 使用中文回答，除股票代码、财务缩写或必要英文术语外，不要切换到英文。"
-            : "9) Reply in English. Use Chinese only for stock symbols, financial abbreviations, or when quoting source terms. ";
+            ? "9) Reply in Chinese. Keep stock symbols and standard financial abbreviations as-is."
+            : "9) Reply in English. Use Chinese only when quoting user-provided Chinese source terms.";
 
         String lengthInstruction = "zh".equals(responseLanguage)
-            ? "5) 文字必须精炼：总长度控制在 220-420 个汉字，分 3-5 个短段落，每段不超过 3 句。"
-            : "5) Keep the answer concise: about 160-320 English words, split into 3-5 short paragraphs, no more than 3 sentences each. ";
+            ? "5) Keep the response concise: about 220-420 Chinese characters, 3-5 short paragraphs, max 3 sentences each."
+            : "5) Keep the response concise: about 160-320 English words, 3-5 short paragraphs, max 3 sentences each.";
 
         String dataAvailabilityInstruction = officialDataUsable
-            ? "10) 上下文 official_data_usable=true 时，禁止输出“官方数据暂不可得”或同义句。"
-            : "10) 仅当 official_data_usable=false 时，才允许说明“官方数据暂不可得，无法给出该项定量预测”，且最多出现 1 次。";
+            ? "10) When official_data_usable=true, do not state that official data is unavailable."
+            : "10) Only when official_data_usable=false, you may state that official data is unavailable and "
+                + "quantitative prediction cannot be provided, and this statement can appear at most once.";
 
-        String antiBoilerplateInstruction = "11) 风险提示必须与本轮问题和上下文数据直接相关，禁止每次复用固定模板（如回测、汇率、利率对冲等）";
+        String antiBoilerplateInstruction = "11) Risk notes must be specific to this question and context. "
+            + "Do not repeat fixed boilerplate templates across every answer.";
 
         return """
-            你是一名专业的投资组合分析助手，擅长基于结构化持仓与市场数据输出可执行建议。
-            你会收到系统注入的投资组合上下文 JSON（用户不可见），并据此回答用户问题。
-            当前系统日期：%s。
-            回答规范：
-            1) 先给结论，再解释依据；
-            2) 涉及买卖建议时，明确标的、方向、建议仓位或比例区间；
-                3) 同时给出风险提示和止损/再平衡条件；
-            4) 禁止编造上下文中不存在的持仓数据。
+            You are a professional portfolio analysis assistant.
+            You will receive an internally injected portfolio context JSON (not visible to the user).
+            Use that context to answer the user question.
+            System date: %s.
+            Response rules:
+            1) Give the conclusion first, then explain the evidence.
+            2) For buy/sell suggestions, specify symbol, direction, and suggested position/range.
+            3) Include risk notes and stop-loss/rebalancing conditions when relevant.
+            4) Never fabricate holdings or numbers that are not present in context.
             %s
-            6) 优先用短句 + 图表表达，不要输出大段复述。
-            7) 若上下文包含 official_market_intelligence，必须优先参考该外部市场数据，再结合组合数据给结论。
-            8) 严禁虚构实时价格、历史区间、收益率。只能使用上下文里出现的数字；若数据缺失必须明确写“官方数据暂不可得，无法给出该项定量预测”。
+            6) Prefer short sentences and charts over long repetitive text.
+            7) If official_market_intelligence is present, prioritize it and combine it with portfolio context.
+            8) Never invent real-time prices, historical ranges, or returns. Use only numbers from context.
             %s
             %s
             %s
