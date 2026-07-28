@@ -3,7 +3,6 @@ package com.portfolio.service;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.Map;
 
 /**
  * Simulated dividend service with predefined tax rates.
