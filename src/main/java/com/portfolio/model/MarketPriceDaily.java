@@ -3,7 +3,6 @@ package com.portfolio.model;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.Instant;
 
 public record MarketPriceDaily(
         Long id,
