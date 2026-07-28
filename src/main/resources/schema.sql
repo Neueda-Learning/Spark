@@ -71,13 +71,51 @@ CREATE TABLE IF NOT EXISTS transaction (
     CONSTRAINT chk_type CHECK (type IN ('BUY','SELL'))
 );
 
-CREATE TABLE IF NOT EXISTS portfolio_snapshot (
-    id             BIGINT         AUTO_INCREMENT PRIMARY KEY,
-    portfolio_id   BIGINT         NOT NULL,
-    snapshot_date  DATE           NOT NULL,
-    total_value    DECIMAL(18,2)  NOT NULL,
-    cash_balance   DECIMAL(18,2)  NOT NULL,
-    invested_cost  DECIMAL(18,2)  NOT NULL,
-    CONSTRAINT fk_snap_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolio(id),
-    CONSTRAINT uq_portfolio_date UNIQUE (portfolio_id, snapshot_date)
+DROP TABLE IF EXISTS portfolio_snapshot;
+
+CREATE TABLE IF NOT EXISTS portfolio_performance_cache (
+    id                 BIGINT         AUTO_INCREMENT PRIMARY KEY,
+    portfolio_id       BIGINT         NOT NULL,
+    performance_date   DATE           NOT NULL,
+    invested_cost      DECIMAL(18,2)  NOT NULL,
+    cumulative_profit  DECIMAL(18,2)  NOT NULL,
+    return_rate        DECIMAL(10,4)  NOT NULL,
+    total_value        DECIMAL(18,2)  NOT NULL,
+    refreshed_at       TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_perf_cache_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolio(id),
+    CONSTRAINT uq_perf_cache_portfolio_date UNIQUE (portfolio_id, performance_date)
+);
+
+CREATE TABLE IF NOT EXISTS market_price_daily (
+    id              BIGINT         AUTO_INCREMENT PRIMARY KEY,
+    stock_id        BIGINT         NOT NULL,
+    trade_date      DATE           NOT NULL,
+    open_price      DECIMAL(18,6)  NOT NULL,
+    high_price      DECIMAL(18,6)  NOT NULL,
+    low_price       DECIMAL(18,6)  NOT NULL,
+    close_price     DECIMAL(18,6)  NOT NULL,
+    adjusted_close  DECIMAL(18,6),
+    volume          BIGINT         NOT NULL DEFAULT 0,
+    source          VARCHAR(20)    NOT NULL DEFAULT 'YAHOO',
+    fetched_at      TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    INDEX idx_market_price_trade_date (trade_date),
+    
+    CONSTRAINT fk_market_price_stock
+        FOREIGN KEY (stock_id) REFERENCES stock(id),
+
+    CONSTRAINT uq_market_price_stock_date
+        UNIQUE (stock_id, trade_date),
+
+    CONSTRAINT chk_market_price_values CHECK (
+        open_price > 0
+        AND high_price > 0
+        AND low_price > 0
+        AND close_price > 0
+        AND high_price >= open_price
+        AND high_price >= close_price
+        AND low_price <= open_price
+        AND low_price <= close_price
+        AND volume >= 0
+    )
 );

@@ -7,10 +7,22 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #eef3f8;
+            --panel: rgba(255,255,255,.88);
+            --panel-border: rgba(148,163,184,.18);
+            --text: #0f172a;
+            --muted: #64748b;
+            --accent: #2563eb;
+            --accent-soft: rgba(37,99,235,.12);
+            --shadow: 0 18px 40px rgba(15,23,42,.08);
+        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5;
-            color: #333;
+            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background:
+                radial-gradient(circle at top left, rgba(37,99,235,.12), transparent 28%),
+                linear-gradient(180deg, #f7fafc 0%, var(--bg) 100%);
+            color: var(--text);
             min-height: 100vh;
         }
 
@@ -51,8 +63,8 @@
 
         /* ===== Container ===== */
         .container {
-            max-width: 1200px;
-            margin: 24px auto;
+            max-width: 1280px;
+            margin: 28px auto;
             padding: 0 20px;
         }
         .tab-content { display: none; }
@@ -60,17 +72,27 @@
 
         /* ===== Cards ===== */
         .card {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 1px 4px rgba(0,0,0,.08);
+            background: var(--panel);
+            border-radius: 20px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--panel-border);
+            backdrop-filter: blur(10px);
             padding: 24px;
             margin-bottom: 20px;
         }
         .card-title {
-            font-size: 17px;
-            font-weight: 600;
-            margin-bottom: 16px;
-            color: #1e293b;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            color: #0f172a;
+        }
+        .card-subtitle {
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 18px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* ===== Stat Cards ===== */
@@ -81,9 +103,10 @@
             margin-bottom: 20px;
         }
         .stat-card {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 1px 4px rgba(0,0,0,.08);
+            background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,250,252,.9));
+            border-radius: 18px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(148,163,184,.16);
             padding: 24px;
             text-align: center;
         }
@@ -106,14 +129,108 @@
         /* ===== Chart Row ===== */
         .chart-row {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: minmax(320px, 0.78fr) minmax(600px, 1.22fr);
             gap: 20px;
+            align-items: stretch;
+        }
+        .chart-card {
+            display: flex;
+            flex-direction: column;
+            min-height: 100%;
+            padding: 22px 22px 26px;
+        }
+        .chart-panel-head {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+            align-items: start;
+            gap: 16px;
+            margin-bottom: 18px;
+        }
+        .chart-card--allocation .chart-panel-head {
+            grid-template-columns: minmax(0, 1fr) minmax(220px, 240px);
+            gap: 12px;
+        }
+        .chart-panel-copy {
+            min-width: 0;
+        }
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+            margin-bottom: 10px;
+        }
+        .chart-meta {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            width: 100%;
+        }
+        .metric-pill {
+            min-width: 0;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: linear-gradient(180deg, rgba(248,250,252,.98), rgba(241,245,249,.88));
+            border: 1px solid rgba(148,163,184,.18);
+        }
+        .metric-pill .k {
+            display: block;
+            font-size: 11px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            margin-bottom: 6px;
+        }
+        .metric-pill .v {
+            display: block;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .chart-card--allocation .metric-pill {
+            padding: 8px 10px;
+        }
+        .chart-card--allocation .metric-pill .k {
+            font-size: 10px;
+            margin-bottom: 4px;
+        }
+        .chart-card--allocation .metric-pill .v {
+            font-size: 13px;
         }
         .chart-wrapper {
             position: relative;
             width: 100%;
+            border-radius: 18px;
+            background: linear-gradient(180deg, rgba(255,255,255,.68), rgba(248,250,252,.92));
+            border: 1px solid rgba(226,232,240,.9);
         }
-        .chart-wrapper canvas { width: 100% !important; }
+        .allocation-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+        .chart-wrapper--pie {
+            height: 382px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 14px 16px 10px;
+        }
+        .chart-wrapper--bar {
+            height: 382px;
+            padding: 14px 16px 10px;
+        }
+        .chart-wrapper canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
 
         /* ===== Tables ===== */
         table {
@@ -371,6 +488,10 @@
         @media (max-width: 768px) {
             .stat-row { grid-template-columns: 1fr; }
             .chart-row { grid-template-columns: 1fr; }
+            .chart-panel-head { grid-template-columns: 1fr; }
+            .chart-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .chart-wrapper--pie { height: 336px; }
+            .chart-wrapper--bar { height: 336px; }
             .stat-card .value { font-size: 24px; }
             table { font-size: 12px; }
             thead th, tbody td { padding: 8px 6px; }
@@ -408,15 +529,31 @@
             </div>
         </div>
         <div class="chart-row">
-            <div class="card">
-                <div class="card-title">资产分配</div>
-                <div class="chart-wrapper">
-                    <canvas id="pieChart"></canvas>
+            <div class="card chart-card chart-card--allocation">
+                <div class="chart-panel-head">
+                    <div class="chart-panel-copy">
+                        <div class="eyebrow">Allocation</div>
+                        <div class="card-title">资产分配</div>
+                        <div class="card-subtitle">查看组合资产结构分布。</div>
+                    </div>
+                    <div class="chart-meta" id="allocation-meta"></div>
+                </div>
+                <div class="allocation-layout">
+                    <div class="chart-wrapper chart-wrapper--pie">
+                        <canvas id="pieChart"></canvas>
+                    </div>
                 </div>
             </div>
-            <div class="card">
-                <div class="card-title">每日收益</div>
-                <div class="chart-wrapper">
+            <div class="card chart-card">
+                <div class="chart-panel-head">
+                    <div class="chart-panel-copy">
+                        <div class="eyebrow">Performance</div>
+                        <div class="card-title">近七日浮盈走势</div>
+                        <div class="card-subtitle">柱状展示绝对收益，折线展示收益率，便于同时观察方向和幅度。</div>
+                    </div>
+                    <div class="chart-meta" id="performance-meta"></div>
+                </div>
+                <div class="chart-wrapper chart-wrapper--bar">
                     <canvas id="barLineChart"></canvas>
                 </div>
             </div>
@@ -532,6 +669,19 @@ function fmtPct(n) {
 }
 function pnlClass(n) { return n >= 0 ? 'positive' : 'negative'; }
 function escapeHtml(value) {
+     return String(value).replace(/[&<>"']/g, ch => ({
+         '&': '&amp;',
+         '<': '&lt;',
+         '>': '&gt;',
+         '"': '&quot;',
+         "'": '&#39;'
+     }[ch]));
+ }
+function createMetricPill(label, value, className) {
+    const safeLabel = escapeHtml(label);
+    const safeValue = escapeHtml(value);
+    return '<div class="metric-pill' + (className ? ' ' + className : '') + '"><span class="k">' + safeLabel + '</span><span class="v">' + safeValue + '</span></div>';
+}
     const text = value === null || value === undefined ? '' : String(value);
     return text.replace(/[&<>"']/g, char => ({
         '&': '&amp;',
@@ -567,8 +717,9 @@ async function loadOverview(force) {
         overviewData = ovRes;
         weeklyData = wkRes;
         renderStatCards(); // 用 overviewData 渲染顶部的4个统计卡片（总值/总盈亏/日盈亏/现金）
+        renderOverviewInsights();
         renderPieChart();  // 用 overviewData.allocation 画资产分配饼图
-        renderBarLineChart();   // 用 weeklyData 画7天收益柱状+折线图
+        renderBarLineChart();   // 用 weeklyData 画7天浮盈柱状+折线图
         dataLoaded.overview = true; //标记总览页数据已加载完成
     } catch (e) {
         console.error('Failed to load overview:', e);
@@ -595,6 +746,32 @@ function renderStatCards() {
     document.getElementById('stat-cash-pct').textContent = '占总价值 ' + cashPct.toFixed(1) + '%';
 }
 
+function renderOverviewInsights() {
+    const allocationMeta = document.getElementById('allocation-meta');
+    const performanceMeta = document.getElementById('performance-meta');
+
+    const allocation = (overviewData && overviewData.allocation) || [];
+    const allocationTotal = allocation.reduce((sum, item) => sum + Number(item.value || 0), 0);
+    const dominant = allocation.slice().sort((a, b) => (b.value || 0) - (a.value || 0))[0];
+    const dominantPct = dominant && allocationTotal > 0 ? ((dominant.value || 0) / allocationTotal * 100).toFixed(1) + '%' : '--';
+    allocationMeta.innerHTML = [
+        createMetricPill('资产类别', String(allocation.length || 0)),
+        createMetricPill('最大权重', dominant ? dominant.assetType : '--'),
+        createMetricPill('占比', dominantPct)
+    ].join('');
+
+    const performance = weeklyData || [];
+    const latest = performance.length ? performance[performance.length - 1] : null;
+    const avgReturn = performance.length
+        ? performance.reduce((sum, item) => sum + Number(item.returnRate || 0), 0) / performance.length
+        : 0;
+    performanceMeta.innerHTML = [
+        createMetricPill('观察窗口', performance.length ? performance.length + ' 天' : '--'),
+        createMetricPill('最新浮盈', latest ? fmt(latest.dailyProfit || 0) : '--'),
+        createMetricPill('平均收益率', performance.length ? fmtPct(avgReturn) : '--')
+    ].join('');
+}
+
 function renderPieChart() {
     const d = overviewData;
     const colorMap = { 'STOCK': '#3b82f6', 'BOND': '#22c55e', 'CASH': '#f97316' };
@@ -610,15 +787,22 @@ function renderPieChart() {
             datasets: [{
                 data: values,
                 backgroundColor: colors,
-                borderWidth: 2,
-                borderColor: '#fff'
+                borderWidth: 3,
+                borderColor: '#fff',
+                radius: '82%'
             }]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { top: 2, bottom: 2, left: 2, right: 2 } },
             plugins: {
-                legend: { position: 'bottom', labels: { padding: 16, font: { size: 13 } } },
+                legend: { display: false },
                 tooltip: {
+                    backgroundColor: 'rgba(15,23,42,.92)',
+                    titleColor: '#f8fafc',
+                    bodyColor: '#e2e8f0',
+                    padding: 12,
                     callbacks: {
                         label: ctx => {
                             const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
@@ -646,15 +830,17 @@ function renderBarLineChart() {
             labels,
             datasets: [
                 {
-                    label: '每日收益',
+                    label: '每日浮盈',
                     data: pnlData,
                     backgroundColor: pnlData.map(v => v >= 0 ? 'rgba(34,197,94,.6)' : 'rgba(239,68,68,.6)'),
                     borderRadius: 4,
+                    barThickness: 36,
+                    maxBarThickness: 42,
                     yAxisID: 'y',
                     order: 2
                 },
                 {
-                    label: '收益率',
+                    label: '浮盈率',
                     data: retData,
                     type: 'line',
                     borderColor: '#8b5cf6',
@@ -669,18 +855,46 @@ function renderBarLineChart() {
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { top: 8, bottom: 0, left: 2, right: 6 } },
             interaction: { mode: 'index', intersect: false },
             scales: {
-                y: { position: 'left', title: { display: true, text: '收益 ($)' } },
+                x: {
+                    grid: { display: false },
+                    ticks: { maxRotation: 0, minRotation: 0, color: '#475569', font: { size: 12, weight: '600' } }
+                },
+                y: {
+                    position: 'left',
+                    title: { display: true, text: '浮盈 ($)', color: '#64748b', font: { size: 12, weight: '700' } },
+                    ticks: { color: '#64748b' },
+                    grid: { color: 'rgba(226,232,240,.9)' },
+                    grace: '10%'
+                },
                 y1: {
                     position: 'right',
-                    title: { display: true, text: '收益率 (%)' },
+                    title: { display: true, text: '浮盈率 (%)', color: '#64748b', font: { size: 12, weight: '700' } },
                     grid: { drawOnChartArea: false },
-                    ticks: { callback: v => v + '%' }
+                    ticks: { callback: v => v + '%', color: '#64748b' }
                 }
             },
             plugins: {
-                legend: { position: 'bottom', labels: { padding: 16 } }
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        padding: 10,
+                        boxWidth: 12,
+                        useBorderRadius: true,
+                        borderRadius: 4,
+                        color: '#334155',
+                        font: { size: 12, weight: '600' }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(15,23,42,.92)',
+                    titleColor: '#f8fafc',
+                    bodyColor: '#e2e8f0',
+                    padding: 12
+                }
             }
         }
     });

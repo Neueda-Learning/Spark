@@ -23,7 +23,7 @@ export const portfolioApi = {
     api.get<PortfolioOverviewResponse>('/portfolio/overview').then((r) => r.data),
   getWeeklyPerformance: () =>
     api
-      .get<WeeklyPerformanceResponse>('/portfolio/weekly-performance')
+      .get<WeeklyPerformanceResponse[]>('/portfolio/weekly-performance')
       .then((r) => r.data),
   getHoldings: () =>
     api.get<HoldingResponse[]>('/portfolio/holdings').then((r) => r.data),
