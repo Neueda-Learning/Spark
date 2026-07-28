@@ -198,10 +198,13 @@ public class PortfolioServiceImpl implements PortfolioService {
                     null,               // paidAt
                     null                // createdAt
             );
-            userDividendRepository.save(userDividend);
-            log.info("Created dividend record: {} {} shares={}, gross={}, net={}",
-                    dh.symbol(), dh.exDate(), sharesHeld, grossAmount, netAmount);
-        }
+            try {
+                userDividendRepository.save(userDividend);
+                log.info("Created dividend record: {} {} shares={}, gross={}, net={}",
+                        dh.symbol(), dh.exDate(), sharesHeld, grossAmount, netAmount);
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                continue;
+            }
 
         // 处理派息日到账：将 pending 且 pay_date <= today 的分红加到现金余额
         List<UserDividend> pendingToPay = userDividendRepository.findPendingDividends(portfolioId, today);
