@@ -19,10 +19,14 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -131,6 +135,47 @@ class OfficialMarketDataServiceTest {
                 .containsEntry("source", "internal_market_feed")
                 .containsEntry("data_status", "internal_unavailable")
                 .containsEntry("unavailable_reason", "internal_market_data_unavailable");
+    }
+
+    @Test
+    void evictsOldestEntryWhenCacheReachesItsLimit() {
+        AtomicLong millis = new AtomicLong();
+        Clock tickingClock = mock(Clock.class);
+        when(tickingClock.millis()).thenAnswer(invocation -> millis.incrementAndGet());
+        when(tickingClock.instant()).thenReturn(CLOCK.instant());
+        when(tickingClock.getZone()).thenReturn(CLOCK.getZone());
+        service = new OfficialMarketDataService(
+                priceService,
+                stockRepository,
+                marketPriceRepository,
+                marketDataProvider,
+                tickingClock,
+                "internal"
+        );
+        when(stockRepository.findBySymbol(anyString())).thenAnswer(invocation -> {
+            String symbol = invocation.getArgument(0);
+            return Optional.of(new Stock(
+                    1L,
+                    symbol,
+                    symbol,
+                    "STOCK",
+                    "Technology",
+                    "NASDAQ",
+                    "USD"
+            ));
+        });
+        when(priceService.getCurrentPrice(anyString())).thenReturn(BigDecimal.TEN);
+        when(priceService.getChangePercent(anyString())).thenReturn(BigDecimal.ZERO);
+        when(priceService.getPriceDate(anyString())).thenReturn(LocalDate.of(2026, 7, 28));
+        when(priceService.getPriceSource(anyString())).thenReturn("TEST");
+        when(marketPriceRepository.findRecentByStockId(1L, 7)).thenReturn(List.of());
+
+        for (int index = 0; index <= 256; index++) {
+            service.buildInsight("S" + index);
+        }
+        service.buildInsight("S0");
+
+        verify(stockRepository, times(2)).findBySymbol("S0");
     }
 
     private OfficialMarketDataService serviceWithMode(String mode) {

@@ -119,27 +119,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
         List<Map<String, Object>> heldStocks = aiAssistantRepository.findHeldStocks(portfolioId)
                 .stream()
-                .map(row -> {
-                    BigDecimal latestPrice = priceService.getCurrentPrice(row.symbol());
-                    BigDecimal marketValue = latestPrice.multiply(row.quantity());
-                    BigDecimal costValue = row.averageCost().multiply(row.quantity());
-                    BigDecimal profitRate = BigDecimal.ZERO;
-                    if (costValue.compareTo(BigDecimal.ZERO) > 0) {
-                        profitRate = marketValue.subtract(costValue)
-                                .multiply(BigDecimal.valueOf(100))
-                                .divide(costValue, 2, RoundingMode.HALF_UP);
-                    }
-                    Map<String, Object> item = new LinkedHashMap<>();
-                    item.put("stock_id", row.stockId());
-                    item.put("symbol", row.symbol());
-                    item.put("name", row.name());
-                    item.put("asset_type", row.assetType());
-                    item.put("quantity", row.quantity().setScale(4, RoundingMode.HALF_UP));
-                    item.put("average_cost", row.averageCost().setScale(4, RoundingMode.HALF_UP));
-                    item.put("latest_price", latestPrice.setScale(2, RoundingMode.HALF_UP));
-                    item.put("profit_rate", profitRate);
-                    return item;
-                })
+                .map(row -> buildHeldStock(row, warnings))
                 .toList();
 
         List<AiAssistantRepository.AvailableStockRow> availableStocks = aiAssistantRepository.findAvailableStocks(portfolioId);
@@ -156,6 +136,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             }
 
         BigDecimal totalMarketValue = heldStocks.stream()
+                .filter(item -> item.get("latest_price") instanceof BigDecimal)
                 .map(item -> ((BigDecimal) item.get("latest_price")).multiply((BigDecimal) item.get("quantity")))
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, RoundingMode.HALF_UP);
@@ -190,16 +171,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
             List<Map<String, Object>> marketCandidates = availableStocks
                     .stream()
                     .limit(12)
-                    .map(row -> {
-                        Map<String, Object> item = new LinkedHashMap<>();
-                        item.put("stock_id", row.stockId());
-                        item.put("symbol", row.symbol());
-                        item.put("name", row.name());
-                        item.put("asset_type", row.assetType());
-                        item.put("latest_price", priceService.getCurrentPrice(row.symbol()).setScale(2, RoundingMode.HALF_UP));
-                        item.put("change_percent", priceService.getChangePercent(row.symbol()).setScale(2, RoundingMode.HALF_UP));
-                        return item;
-                    })
+                    .map(row -> buildMarketCandidate(row, warnings))
                     .toList();
             payload.put("market_candidates", marketCandidates);
             knownSymbols.addAll(marketCandidates.stream().map(item -> String.valueOf(item.get("symbol"))).toList());
@@ -268,6 +240,63 @@ public class AiAssistantServiceImpl implements AiAssistantService {
         }
 
         return new ContextPayload(toPrettyJson(payload), officialDataUsable);
+    }
+
+    private Map<String, Object> buildHeldStock(
+            AiAssistantRepository.HeldStockRow row,
+            List<String> warnings
+    ) {
+        BigDecimal quantity = row.quantity() == null ? BigDecimal.ZERO : row.quantity();
+        BigDecimal averageCost = row.averageCost() == null ? BigDecimal.ZERO : row.averageCost();
+
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("stock_id", row.stockId());
+        item.put("symbol", row.symbol());
+        item.put("name", row.name());
+        item.put("asset_type", row.assetType());
+        item.put("quantity", quantity.setScale(4, RoundingMode.HALF_UP));
+        item.put("average_cost", averageCost.setScale(4, RoundingMode.HALF_UP));
+
+        try {
+            BigDecimal latestPrice = priceService.getCurrentPrice(row.symbol());
+            BigDecimal marketValue = latestPrice.multiply(quantity);
+            BigDecimal costValue = averageCost.multiply(quantity);
+            BigDecimal profitRate = BigDecimal.ZERO;
+            if (costValue.compareTo(BigDecimal.ZERO) > 0) {
+                profitRate = marketValue.subtract(costValue)
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(costValue, 2, RoundingMode.HALF_UP);
+            }
+            item.put("latest_price", latestPrice.setScale(2, RoundingMode.HALF_UP));
+            item.put("profit_rate", profitRate);
+        } catch (RuntimeException exception) {
+            item.put("market_data_status", "unavailable");
+            warnings.add("Current price is unavailable for held symbol " + row.symbol()
+                    + "; its market value and return are omitted.");
+        }
+        return item;
+    }
+
+    private Map<String, Object> buildMarketCandidate(
+            AiAssistantRepository.AvailableStockRow row,
+            List<String> warnings
+    ) {
+        Map<String, Object> item = new LinkedHashMap<>();
+        item.put("stock_id", row.stockId());
+        item.put("symbol", row.symbol());
+        item.put("name", row.name());
+        item.put("asset_type", row.assetType());
+        try {
+            BigDecimal latestPrice = priceService.getCurrentPrice(row.symbol());
+            BigDecimal changePercent = priceService.getChangePercent(row.symbol());
+            item.put("latest_price", latestPrice.setScale(2, RoundingMode.HALF_UP));
+            item.put("change_percent", changePercent.setScale(2, RoundingMode.HALF_UP));
+        } catch (RuntimeException exception) {
+            item.put("market_data_status", "unavailable");
+            warnings.add("Market data is unavailable for candidate symbol " + row.symbol()
+                    + "; its price metrics are omitted.");
+        }
+        return item;
     }
 
         private String buildSystemPrompt(boolean shouldGenerateCharts,

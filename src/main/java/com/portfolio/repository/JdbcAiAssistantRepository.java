@@ -6,15 +6,18 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.sql.Date;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @Repository
 public class JdbcAiAssistantRepository implements AiAssistantRepository {
 
     private final JdbcTemplate jdbc;
+    private final ConcurrentMap<String, String> tableNameCache = new ConcurrentHashMap<>();
+    private final ConcurrentMap<String, String> columnNameCache = new ConcurrentHashMap<>();
 
     public JdbcAiAssistantRepository(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -65,6 +68,7 @@ public class JdbcAiAssistantRepository implements AiAssistantRepository {
                     rs.getBigDecimal("average_cost")
             ), portfolioId);
         } catch (Exception e) {
+            clearMetadataCache();
             return List.of();
         }
     }
@@ -130,6 +134,7 @@ public class JdbcAiAssistantRepository implements AiAssistantRepository {
                     rs.getString("asset_type")
             ), portfolioId);
         } catch (Exception e) {
+            clearMetadataCache();
             return List.of();
         }
     }
@@ -155,6 +160,7 @@ public class JdbcAiAssistantRepository implements AiAssistantRepository {
             }
             return Optional.ofNullable(rows.getFirst());
         } catch (Exception e) {
+            clearMetadataCache();
             return Optional.empty();
         }
     }
@@ -194,17 +200,26 @@ public class JdbcAiAssistantRepository implements AiAssistantRepository {
                 );
             }, portfolioId, limit);
         } catch (Exception e) {
+            clearMetadataCache();
             return List.of();
         }
     }
 
     private String firstExistingTable(String... candidates) {
+        String cacheKey = String.join("|", candidates).toLowerCase(Locale.ROOT);
+        String cached = tableNameCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
         String sql = "SELECT table_name FROM information_schema.tables "
                 + "WHERE table_schema = DATABASE() AND LOWER(table_name) = LOWER(?) LIMIT 1";
         for (String candidate : candidates) {
             List<String> rows = jdbc.query(sql, (rs, rowNum) -> rs.getString("table_name"), candidate);
             if (!rows.isEmpty()) {
-                return rows.getFirst();
+                String resolved = rows.getFirst();
+                tableNameCache.putIfAbsent(cacheKey, resolved);
+                return resolved;
             }
         }
         return null;
@@ -214,15 +229,28 @@ public class JdbcAiAssistantRepository implements AiAssistantRepository {
         if (tableName == null) {
             return null;
         }
+        String cacheKey = (tableName + "|" + String.join("|", candidates)).toLowerCase(Locale.ROOT);
+        String cached = columnNameCache.get(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
         String sql = "SELECT column_name FROM information_schema.columns "
                 + "WHERE table_schema = DATABASE() AND LOWER(table_name) = LOWER(?) AND LOWER(column_name) = LOWER(?) LIMIT 1";
         for (String candidate : candidates) {
             List<String> rows = jdbc.query(sql, (rs, rowNum) -> rs.getString("column_name"), tableName, candidate);
             if (!rows.isEmpty()) {
-                return rows.getFirst();
+                String resolved = rows.getFirst();
+                columnNameCache.putIfAbsent(cacheKey, resolved);
+                return resolved;
             }
         }
         return null;
+    }
+
+    private void clearMetadataCache() {
+        tableNameCache.clear();
+        columnNameCache.clear();
     }
 
     private String columnOrDefault(String alias, String columnName, String fallbackExpression) {

@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class OfficialMarketDataService {
 
     private static final long CACHE_TTL_MILLIS = 30L * 60L * 1000L;
+    private static final int MAX_CACHE_ENTRIES = 256;
 
     private final PriceService priceService;
     private final StockRepository stockRepository;
@@ -70,13 +71,35 @@ public class OfficialMarketDataService {
         if (hit != null && nowMillis - hit.cachedAtMillis < CACHE_TTL_MILLIS) {
             return Optional.of(hit.payload);
         }
+        if (hit != null) {
+            cache.remove(normalizedSymbol, hit);
+        }
 
         Map<String, Object> payload = switch (mode) {
             case "yahoo", "external" -> buildFromYahoo(normalizedSymbol);
             default -> buildFromInternalFeed(normalizedSymbol);
         };
-        cache.put(normalizedSymbol, new CacheEntry(nowMillis, payload));
+        cacheInsight(normalizedSymbol, nowMillis, payload);
         return Optional.of(payload);
+    }
+
+    private synchronized void cacheInsight(
+            String symbol,
+            long cachedAtMillis,
+            Map<String, Object> payload
+    ) {
+        long expiryCutoff = cachedAtMillis - CACHE_TTL_MILLIS;
+        cache.entrySet().removeIf(entry -> entry.getValue().cachedAtMillis <= expiryCutoff);
+
+        if (cache.size() >= MAX_CACHE_ENTRIES && !cache.containsKey(symbol)) {
+            cache.entrySet().stream()
+                    .min(Map.Entry.comparingByValue(
+                            Comparator.comparingLong(CacheEntry::cachedAtMillis)
+                    ))
+                    .map(Map.Entry::getKey)
+                    .ifPresent(cache::remove);
+        }
+        cache.put(symbol, new CacheEntry(cachedAtMillis, payload));
     }
 
     private Map<String, Object> buildFromInternalFeed(String symbol) {

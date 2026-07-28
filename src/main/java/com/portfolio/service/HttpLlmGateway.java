@@ -16,6 +16,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +29,7 @@ public class HttpLlmGateway implements LlmGateway {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
+    private final Duration requestTimeout;
 
     private final String provider;
     private final String model;
@@ -39,10 +41,16 @@ public class HttpLlmGateway implements LlmGateway {
                           @Value("${ai.provider:openai}") String provider,
                           @Value("${ai.model:gpt-4o-mini}") String model,
                           @Value("${ai.api-key:}") String apiKey,
-                          @Value("${ai.chat-url:https://api.openai.com/v1/chat/completions}") String chatUrl) {
+                          @Value("${ai.chat-url:https://api.openai.com/v1/chat/completions}") String chatUrl,
+                          @Value("${ai.http.connect-timeout:10s}") Duration connectTimeout,
+                          @Value("${ai.http.request-timeout:60s}") Duration requestTimeout) {
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
-        this.httpClient = HttpClient.newHttpClient();
+        this.httpClient = HttpClient.newBuilder()
+                .connectTimeout(connectTimeout)
+                .followRedirects(HttpClient.Redirect.NORMAL)
+                .build();
+        this.requestTimeout = requestTimeout;
         this.provider = provider;
         this.model = model;
         this.apiKey = apiKey;
@@ -91,6 +99,7 @@ public class HttpLlmGateway implements LlmGateway {
         }
 
         HttpRequest request = HttpRequest.newBuilder(URI.create(chatUrl))
+                .timeout(requestTimeout)
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
