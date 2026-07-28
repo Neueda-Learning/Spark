@@ -46,13 +46,6 @@ export interface WeeklyPerformanceResponse {
   cumulativeReturn: number;
 }
 
-export interface PriceHistoryResponse {
-  stockId: number;
-  symbol: string;
-  dates: string[];
-  prices: number[];
-}
-
 export interface TransactionRequest {
   stockId: number;
   type: 'BUY' | 'SELL';

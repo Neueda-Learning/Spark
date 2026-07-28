@@ -2,10 +2,12 @@ package com.portfolio.scheduler;
 
 import com.portfolio.service.MarketDataSyncService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile("!demo & !test")
 @ConditionalOnProperty(
         name = "market-data.sync.enabled",
         havingValue = "true",

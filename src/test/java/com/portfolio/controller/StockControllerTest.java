@@ -2,11 +2,10 @@ package com.portfolio.controller;
 
 import com.portfolio.dto.CandleResponse;
 import com.portfolio.dto.CandleSeriesResponse;
-import com.portfolio.dto.PriceHistoryResponse;
 import com.portfolio.dto.StockInfoResponse;
 import com.portfolio.model.Stock;
+import com.portfolio.service.CandleInterval;
 import com.portfolio.service.CandleService;
-import com.portfolio.service.PriceService;
 import com.portfolio.service.StockService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -32,9 +31,6 @@ class StockControllerTest {
 
     @MockBean
     private StockService stockService;
-
-    @MockBean
-    private PriceService priceService;
 
     @MockBean
     private CandleService candleService;
@@ -76,41 +72,17 @@ class StockControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/stocks/{id}/prices returns 7-day price history")
-    void getPrices_returns200() throws Exception {
+    @DisplayName("GET /api/stocks/{id}/candles defaults to daily candles")
+    void getCandles_defaultsToDaily() throws Exception {
         when(stockService.getStockById(1L)).thenReturn(Optional.of(aapl));
-        when(priceService.getSevenDayPriceHistory("AAPL")).thenReturn(List.of(
-                new PriceHistoryResponse(LocalDate.of(2026, 7, 20), new BigDecimal("193.00"),
-                        new BigDecimal("195.50"), new BigDecimal("196.00"), new BigDecimal("192.50"), 15_000_000L)
-        ));
-
-        mockMvc.perform(get("/api/stocks/1/prices"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].closePrice").value(195.50))
-                .andExpect(jsonPath("$[0].date").value("2026-07-20"));
-    }
-
-    @Test
-    @DisplayName("GET /api/stocks/{id}/prices returns 404 when stock not found")
-    void getPrices_stockNotFound_returns404() throws Exception {
-        when(stockService.getStockById(99L)).thenReturn(Optional.empty());
-
-        mockMvc.perform(get("/api/stocks/99/prices"))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    @DisplayName("GET /api/stocks/{id}/candles returns weekly candles")
-    void getCandles_returns200() throws Exception {
-        when(stockService.getStockById(1L)).thenReturn(Optional.of(aapl));
-        when(candleService.getWeeklyCandles(1L, 52)).thenReturn(new CandleSeriesResponse(
+        when(candleService.getCandles(1L, CandleInterval.DAILY, 120)).thenReturn(new CandleSeriesResponse(
                 1L,
                 "AAPL",
-                "WEEKLY",
+                "DAILY",
                 "YAHOO",
                 LocalDate.of(2026, 7, 24),
                 List.of(new CandleResponse(
-                        LocalDate.of(2026, 7, 20),
+                        LocalDate.of(2026, 7, 24),
                         new BigDecimal("210.10"),
                         new BigDecimal("218.20"),
                         new BigDecimal("208.40"),
@@ -122,26 +94,68 @@ class StockControllerTest {
 
         mockMvc.perform(get("/api/stocks/1/candles"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.interval").value("WEEKLY"))
+                .andExpect(jsonPath("$.interval").value("DAILY"))
                 .andExpect(jsonPath("$.asOf").value("2026-07-24"))
-                .andExpect(jsonPath("$.candles[0].date").value("2026-07-20"))
+                .andExpect(jsonPath("$.candles[0].date").value("2026-07-24"))
                 .andExpect(jsonPath("$.candles[0].close").value(216.75));
+    }
+
+    @Test
+    @DisplayName("GET /api/stocks/{id}/candles supports weekly candles")
+    void getCandles_supportsWeekly() throws Exception {
+        when(stockService.getStockById(1L)).thenReturn(Optional.of(aapl));
+        when(candleService.getCandles(1L, CandleInterval.WEEKLY, 52)).thenReturn(
+                new CandleSeriesResponse(
+                        1L,
+                        "AAPL",
+                        "WEEKLY",
+                        "YAHOO",
+                        LocalDate.of(2026, 7, 24),
+                        List.of()
+                )
+        );
+
+        mockMvc.perform(get("/api/stocks/1/candles").param("interval", "WEEKLY"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.interval").value("WEEKLY"));
+    }
+
+    @Test
+    @DisplayName("GET /api/stocks/{id}/candles supports monthly candles")
+    void getCandles_supportsMonthly() throws Exception {
+        when(stockService.getStockById(1L)).thenReturn(Optional.of(aapl));
+        when(candleService.getCandles(1L, CandleInterval.MONTHLY, 60)).thenReturn(
+                new CandleSeriesResponse(
+                        1L,
+                        "AAPL",
+                        "MONTHLY",
+                        "YAHOO",
+                        LocalDate.of(2026, 7, 24),
+                        List.of()
+                )
+        );
+
+        mockMvc.perform(get("/api/stocks/1/candles").param("interval", "monthly"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.interval").value("MONTHLY"));
     }
 
     @Test
     @DisplayName("GET /api/stocks/{id}/candles rejects unsupported interval")
     void getCandles_unsupportedInterval_returns400() throws Exception {
-        mockMvc.perform(get("/api/stocks/1/candles").param("interval", "DAILY"))
+        mockMvc.perform(get("/api/stocks/1/candles").param("interval", "HOURLY"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Unsupported candle interval: DAILY"));
+                .andExpect(jsonPath("$.message").value("Unsupported candle interval: HOURLY"));
     }
 
     @Test
-    @DisplayName("GET /api/stocks/{id}/candles rejects weeks outside supported range")
-    void getCandles_invalidWeeks_returns400() throws Exception {
-        mockMvc.perform(get("/api/stocks/1/candles").param("weeks", "105"))
+    @DisplayName("GET /api/stocks/{id}/candles rejects limit outside interval range")
+    void getCandles_invalidLimit_returns400() throws Exception {
+        mockMvc.perform(get("/api/stocks/1/candles")
+                        .param("interval", "WEEKLY")
+                        .param("limit", "105"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("weeks must be between 1 and 104"));
+                .andExpect(jsonPath("$.message").value("limit must be between 1 and 104 for WEEKLY"));
     }
 
     @Test

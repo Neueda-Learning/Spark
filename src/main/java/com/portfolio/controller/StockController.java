@@ -1,11 +1,10 @@
 package com.portfolio.controller;
 
 import com.portfolio.dto.CandleSeriesResponse;
-import com.portfolio.dto.PriceHistoryResponse;
 import com.portfolio.dto.StockInfoResponse;
 import com.portfolio.model.Stock;
+import com.portfolio.service.CandleInterval;
 import com.portfolio.service.CandleService;
-import com.portfolio.service.PriceService;
 import com.portfolio.service.StockService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,16 +16,13 @@ import java.util.List;
 public class StockController {
 
     private final StockService stockService;
-    private final PriceService priceService;
     private final CandleService candleService;
 
     public StockController(
             StockService stockService,
-            PriceService priceService,
             CandleService candleService
     ) {
         this.stockService = stockService;
-        this.priceService = priceService;
         this.candleService = candleService;
     }
 
@@ -49,32 +45,17 @@ public class StockController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /**
-     * GET /api/stocks/{id}/prices — 获取某标的过去7天价格历史
-     * 前端页面2：鼠标悬停弹窗中的价格走势图数据
-     */
-    @GetMapping("/{id}/prices")
-    public ResponseEntity<List<PriceHistoryResponse>> getPriceHistory(@PathVariable Long id) {
-        return stockService.getStockById(id)
-                .map(stock -> ResponseEntity.ok(priceService.getSevenDayPriceHistory(stock.symbol())))
-                .orElse(ResponseEntity.notFound().build());
-    }
-
     @GetMapping("/{id}/candles")
     public ResponseEntity<CandleSeriesResponse> getCandles(
             @PathVariable Long id,
-            @RequestParam(defaultValue = "WEEKLY") String interval,
-            @RequestParam(defaultValue = "52") int weeks
+            @RequestParam(defaultValue = "DAILY") String interval,
+            @RequestParam(required = false) Integer limit
     ) {
-        if (!"WEEKLY".equalsIgnoreCase(interval)) {
-            throw new IllegalArgumentException("Unsupported candle interval: " + interval);
-        }
-        if (weeks < 1 || weeks > 104) {
-            throw new IllegalArgumentException("weeks must be between 1 and 104");
-        }
+        CandleInterval candleInterval = CandleInterval.parse(interval);
+        int resolvedLimit = candleInterval.resolveLimit(limit);
         if (stockService.getStockById(id).isEmpty()) {
             return ResponseEntity.notFound().build();
         }
-        return ResponseEntity.ok(candleService.getWeeklyCandles(id, weeks));
+        return ResponseEntity.ok(candleService.getCandles(id, candleInterval, resolvedLimit));
     }
 }
