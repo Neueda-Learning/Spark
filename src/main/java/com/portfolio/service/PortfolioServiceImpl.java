@@ -229,7 +229,7 @@ public class PortfolioServiceImpl implements PortfolioService {
      * 规则：
      * 1. 如果股票没有除息日或股息率为0，分红为0
      * 2. 如果有除息日，查询除息日当天的持仓数量
-     * 3. 如果除息日当天持有该股票（数量 > 0），分红 = 持仓数量 × 当前价格 × 股息率
+     * 3. 如果除息日当天持有该股票（数量 > 0），分红 = 持仓数量 × 除息日价格 × 股息率
      * 4. 如果除息日当天没有持有（数量为0），分红为0
      */
     private BigDecimal calculateAnnualDividendWithDividendDate(Long portfolioId, Stock stock, 
@@ -247,8 +247,11 @@ public class PortfolioServiceImpl implements PortfolioService {
             return BigDecimal.ZERO;
         }
         
-        // 除息日当天持有，计算分红 = 除息日持仓数量 × 当前价格 × 股息率
-        BigDecimal marketValueOnDividendDate = currentPrice.multiply(holdingOnDividendDate)
+        // 获取除息日当天的价格（收盘价）
+        BigDecimal priceOnDividendDate = priceService.getPriceOnDate(stock.symbol(), stock.dividendDate());
+        
+        // 除息日当天持有，计算分红 = 除息日持仓数量 × 除息日价格 × 股息率
+        BigDecimal marketValueOnDividendDate = priceOnDividendDate.multiply(holdingOnDividendDate)
                 .setScale(2, RoundingMode.HALF_UP);
         return marketValueOnDividendDate.multiply(stock.dividendYield()).setScale(2, RoundingMode.HALF_UP);
     }
@@ -323,8 +326,9 @@ public class PortfolioServiceImpl implements PortfolioService {
             
             // 除息日当天持有该股票，计算分红
             if (holdingOnDividendDate.compareTo(BigDecimal.ZERO) > 0) {
-                BigDecimal currentPrice = priceService.getCurrentPrice(stock.symbol());
-                BigDecimal marketValue = currentPrice.multiply(holdingOnDividendDate)
+                // 获取除息日当天的价格（收盘价）
+                BigDecimal priceOnDividendDate = priceService.getPriceOnDate(stock.symbol(), stock.dividendDate());
+                BigDecimal marketValue = priceOnDividendDate.multiply(holdingOnDividendDate)
                         .setScale(2, RoundingMode.HALF_UP);
                 BigDecimal dividend = marketValue.multiply(stock.dividendYield())
                         .setScale(2, RoundingMode.HALF_UP);
