@@ -13,9 +13,6 @@ import org.springframework.stereotype.Component;
  * Changes in this version:
  * 1. Removes dividend_yield and dividend_date columns from stock table (if exist)
  * 2. Creates dividend_history table
- * 3. Creates user_dividend table
- * 4. Populates dividend_history with quarterly dividend data for all dividend-paying stocks
- */
 @Component
 public class DatabaseMigrationRunner implements CommandLineRunner {
 
