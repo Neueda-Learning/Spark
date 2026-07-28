@@ -32,16 +32,39 @@ public class StockServiceImpl implements StockService {
     @Override
     public List<StockInfoResponse> getAllStocksWithPrice() {
         return stockRepository.findAll().stream()
-                .map(s -> new StockInfoResponse(
-                        s.id(),
-                        s.symbol(),
-                        s.name(),
-                        s.assetType(),
-                        s.sector(),
-                        s.exchange(),
-                        priceService.getCurrentPrice(s.symbol()),
-                        priceService.getChangePercent(s.symbol())
-                ))
+                .map(this::toStockInfoResponse)
                 .toList();
+    }
+
+    private StockInfoResponse toStockInfoResponse(Stock stock) {
+        try {
+            return new StockInfoResponse(
+                    stock.id(),
+                    stock.symbol(),
+                    stock.name(),
+                    stock.assetType(),
+                    stock.sector(),
+                    stock.exchange(),
+                    priceService.getCurrentPrice(stock.symbol()),
+                    priceService.getChangePercent(stock.symbol()),
+                    priceService.getPriceDate(stock.symbol()),
+                    priceService.getPriceSource(stock.symbol()),
+                    priceService.isStale(stock.symbol())
+            );
+        } catch (MarketDataUnavailableException ex) {
+            return new StockInfoResponse(
+                    stock.id(),
+                    stock.symbol(),
+                    stock.name(),
+                    stock.assetType(),
+                    stock.sector(),
+                    stock.exchange(),
+                    null,
+                    null,
+                    null,
+                    null,
+                    true
+            );
+        }
     }
 }

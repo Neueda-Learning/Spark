@@ -1,6 +1,7 @@
 package com.portfolio.service;
 
 import com.portfolio.dto.PriceHistoryResponse;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -10,17 +11,11 @@ import java.util.*;
 
 /**
  * Simulated price service that generates realistic stock prices.
- * In production, replace this with yahoofinance-api integration:
- *
- * <pre>
- *   Stock stock = YahooFinance.get("AAPL");
- *   BigDecimal price = stock.getQuote().getPrice();
- *   List<HistoricalQuote> history = stock.getHistory();
- * </pre>
- *
- * @see <a href="https://github.com/sstrickx/yahoofinance-api">yahoofinance-api</a>
+ * Production uses {@link DatabasePriceService}; this service is limited to
+ * demo and test profiles.
  */
 @Service
+@Profile({"demo", "test"})
 public class SimulatedPriceService implements PriceService {
 
     private static final Map<String, BigDecimal> BASE_PRICES = new LinkedHashMap<>();
