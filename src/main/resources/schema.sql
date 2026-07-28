@@ -69,7 +69,9 @@ CREATE TABLE IF NOT EXISTS market_price_daily (
     volume          BIGINT         NOT NULL DEFAULT 0,
     source          VARCHAR(20)    NOT NULL DEFAULT 'YAHOO',
     fetched_at      TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
+    
+    INDEX idx_market_price_trade_date (trade_date),
+    
     CONSTRAINT fk_market_price_stock
         FOREIGN KEY (stock_id) REFERENCES stock(id),
 
