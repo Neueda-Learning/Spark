@@ -8,9 +8,13 @@ target/
 .settings/
 *.iws
 *.ipr
+*.swp
 
 
 .DS_Store
 Thumbs.db
 
 *.log
+
+.env
+.env.*

@@ -75,10 +75,8 @@ CREATE TABLE IF NOT EXISTS market_price_daily (
     
     CONSTRAINT fk_market_price_stock
         FOREIGN KEY (stock_id) REFERENCES stock(id),
-
     CONSTRAINT uq_market_price_stock_date
         UNIQUE (stock_id, trade_date),
-
     CONSTRAINT chk_market_price_values CHECK (
         open_price > 0
         AND high_price > 0
@@ -91,6 +89,7 @@ CREATE TABLE IF NOT EXISTS market_price_daily (
         AND volume >= 0
     )
 );
+
 
 -- Dividend history announced by companies
 CREATE TABLE IF NOT EXISTS dividend_history (
@@ -122,3 +121,39 @@ CREATE TABLE IF NOT EXISTS user_dividend (
     UNIQUE KEY uk_portfolio_symbol_ex (portfolio_id, symbol, ex_date)
 
 );
+CREATE TABLE IF NOT EXISTS holding (
+    id              BIGINT         AUTO_INCREMENT PRIMARY KEY,
+    portfolio_id    BIGINT         NOT NULL,
+    stock_id        BIGINT         NOT NULL,
+    quantity        DECIMAL(18,4)  NOT NULL DEFAULT 0,
+    average_cost    DECIMAL(15,4)  NOT NULL DEFAULT 0,
+    CONSTRAINT fk_holding_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolio(id),
+    CONSTRAINT fk_holding_stock     FOREIGN KEY (stock_id) REFERENCES stock(id),
+    CONSTRAINT uq_portfolio_stock   UNIQUE (portfolio_id, stock_id)
+);
+
+CREATE TABLE IF NOT EXISTS transaction (
+    id            BIGINT         AUTO_INCREMENT PRIMARY KEY,
+    portfolio_id  BIGINT         NOT NULL,
+    stock_id      BIGINT         NOT NULL,
+    type          VARCHAR(4)     NOT NULL,
+    quantity      DECIMAL(18,4)  NOT NULL,
+    unit_price    DECIMAL(15,4)  NOT NULL,
+    total_amount  DECIMAL(18,2)  NOT NULL,
+    created_at    TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_tx_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolio(id),
+    CONSTRAINT fk_tx_stock     FOREIGN KEY (stock_id) REFERENCES stock(id),
+    CONSTRAINT chk_type CHECK (type IN ('BUY','SELL'))
+);
+
+CREATE TABLE IF NOT EXISTS portfolio_snapshot (
+    id             BIGINT         AUTO_INCREMENT PRIMARY KEY,
+    portfolio_id   BIGINT         NOT NULL,
+    snapshot_date  DATE           NOT NULL,
+    total_value    DECIMAL(18,2)  NOT NULL,
+    cash_balance   DECIMAL(18,2)  NOT NULL,
+    invested_cost  DECIMAL(18,2)  NOT NULL,
+    CONSTRAINT fk_snap_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolio(id),
+    CONSTRAINT uq_portfolio_date UNIQUE (portfolio_id, snapshot_date)
+);
+

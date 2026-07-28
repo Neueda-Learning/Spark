@@ -33,7 +33,7 @@ INSERT IGNORE INTO stock (symbol, name, asset_type, sector, exchange, currency) 
 -- Default portfolio with $100,000 initial cash
 INSERT IGNORE INTO portfolio (id, name, cash_balance) VALUES
 
-(1, 'My Portfolio', 10000.00);
+(1, 'My Portfolio', 100000.00);
 
 -- Align the default portfolio cash with the seeded positions on first startup.
 UPDATE portfolio

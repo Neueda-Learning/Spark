@@ -7,22 +7,13 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        :root {
-            --bg: #eef3f8;
-            --panel: rgba(255,255,255,.88);
-            --panel-border: rgba(148,163,184,.18);
-            --text: #0f172a;
-            --muted: #64748b;
-            --accent: #2563eb;
-            --accent-soft: rgba(37,99,235,.12);
-            --shadow: 0 18px 40px rgba(15,23,42,.08);
-        }
         body {
-            font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background:
-                radial-gradient(circle at top left, rgba(37,99,235,.12), transparent 28%),
-                linear-gradient(180deg, #f7fafc 0%, var(--bg) 100%);
-            color: var(--text);
+                radial-gradient(circle at top left, rgba(59,130,246,.12), transparent 34%),
+                radial-gradient(circle at top right, rgba(34,197,94,.10), transparent 28%),
+                linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
+            color: #333;
             min-height: 100vh;
         }
 
@@ -64,35 +55,169 @@
         /* ===== Container ===== */
         .container {
             max-width: 1280px;
-            margin: 28px auto;
+            margin: 24px auto;
             padding: 0 20px;
         }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
 
+        /* ===== Assistant Chat ===== */
+        .assistant-shell {
+            background: rgba(255,255,255,.92);
+            border: 1px solid rgba(148,163,184,.22);
+            border-radius: 20px;
+            box-shadow: 0 18px 50px rgba(15,23,42,.10);
+            padding: 22px;
+            height: calc(100vh - 118px);
+            min-height: 640px;
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+        }
+        .assistant-head h3 {
+            color: #1e293b;
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+        .assistant-head p {
+            color: #64748b;
+            font-size: 12px;
+            margin-bottom: 12px;
+        }
+        .assistant-messages {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #dbe4f0;
+            background: linear-gradient(180deg, #fbfdff 0%, #f5f8fc 100%);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 0;
+        }
+        .assistant-msg {
+            max-width: min(92%, 820px);
+            padding: 12px 14px;
+            border-radius: 14px;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .assistant-msg.user {
+            margin-left: auto;
+            background: #2563eb;
+            color: #fff;
+        }
+        .assistant-msg.assistant {
+            margin-right: auto;
+            background: #fff;
+            color: #1f2937;
+            border: 1px solid #e2e8f0;
+        }
+        .assistant-input-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+            position: sticky;
+            bottom: 0;
+            padding: 12px 0 2px;
+            align-items: flex-end;
+            background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,.96) 28%, rgba(255,255,255,.99));
+        }
+        .assistant-input-row textarea {
+            flex: 1;
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: 14px;
+            outline: none;
+            resize: none;
+            min-height: 48px;
+            max-height: 180px;
+            line-height: 1.5;
+            overflow-y: auto;
+            box-shadow: 0 8px 24px rgba(15,23,42,.05);
+        }
+        .assistant-input-row textarea:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+        }
+        .assistant-send {
+            border: none;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #fff;
+            border-radius: 14px;
+            padding: 12px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            min-width: 88px;
+            box-shadow: 0 10px 20px rgba(37,99,235,.18);
+        }
+        .assistant-send:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+        .assistant-error {
+            color: #dc2626;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        .assistant-insights {
+            display: none;
+        }
+        .assistant-chart-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #fff;
+            padding: 14px;
+            min-height: 280px;
+        }
+        .assistant-msg-charts {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .assistant-msg-chart-card {
+            background: #f8fafc;
+            border: 1px solid #dbe4f0;
+            border-radius: 10px;
+            padding: 12px;
+        }
+        .assistant-msg-chart-card h5 {
+            font-size: 13px;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+        .assistant-msg-chart-wrap {
+            position: relative;
+            height: 170px;
+        }
+        .assistant-chart-card h4 {
+            color: #1e293b;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .assistant-chart-wrap {
+            position: relative;
+            height: 220px;
+        }
+
         /* ===== Cards ===== */
         .card {
-            background: var(--panel);
-            border-radius: 20px;
-            box-shadow: var(--shadow);
-            border: 1px solid var(--panel-border);
-            backdrop-filter: blur(10px);
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.08);
             padding: 24px;
             margin-bottom: 20px;
         }
         .card-title {
-            font-size: 18px;
-            font-weight: 700;
-            margin-bottom: 4px;
-            color: #0f172a;
-        }
-        .card-subtitle {
-            font-size: 13px;
-            color: var(--muted);
-            margin-bottom: 18px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1e293b;
         }
 
         /* ===== Stat Cards ===== */
@@ -103,10 +228,9 @@
             margin-bottom: 20px;
         }
         .stat-card {
-            background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,250,252,.9));
-            border-radius: 18px;
-            box-shadow: var(--shadow);
-            border: 1px solid rgba(148,163,184,.16);
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.08);
             padding: 24px;
             text-align: center;
         }
@@ -129,108 +253,14 @@
         /* ===== Chart Row ===== */
         .chart-row {
             display: grid;
-            grid-template-columns: minmax(320px, 0.78fr) minmax(600px, 1.22fr);
+            grid-template-columns: 1fr 1fr;
             gap: 20px;
-            align-items: stretch;
-        }
-        .chart-card {
-            display: flex;
-            flex-direction: column;
-            min-height: 100%;
-            padding: 22px 22px 26px;
-        }
-        .chart-panel-head {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
-            align-items: start;
-            gap: 16px;
-            margin-bottom: 18px;
-        }
-        .chart-card--allocation .chart-panel-head {
-            grid-template-columns: minmax(0, 1fr) minmax(220px, 240px);
-            gap: 12px;
-        }
-        .chart-panel-copy {
-            min-width: 0;
-        }
-        .eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 6px 10px;
-            border-radius: 999px;
-            background: var(--accent-soft);
-            color: var(--accent);
-            font-size: 12px;
-            font-weight: 700;
-            letter-spacing: .06em;
-            text-transform: uppercase;
-            margin-bottom: 10px;
-        }
-        .chart-meta {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-            gap: 10px;
-            width: 100%;
-        }
-        .metric-pill {
-            min-width: 0;
-            padding: 10px 12px;
-            border-radius: 14px;
-            background: linear-gradient(180deg, rgba(248,250,252,.98), rgba(241,245,249,.88));
-            border: 1px solid rgba(148,163,184,.18);
-        }
-        .metric-pill .k {
-            display: block;
-            font-size: 11px;
-            color: var(--muted);
-            text-transform: uppercase;
-            letter-spacing: .08em;
-            margin-bottom: 6px;
-        }
-        .metric-pill .v {
-            display: block;
-            font-size: 15px;
-            font-weight: 700;
-            color: var(--text);
-        }
-        .chart-card--allocation .metric-pill {
-            padding: 8px 10px;
-        }
-        .chart-card--allocation .metric-pill .k {
-            font-size: 10px;
-            margin-bottom: 4px;
-        }
-        .chart-card--allocation .metric-pill .v {
-            font-size: 13px;
         }
         .chart-wrapper {
             position: relative;
             width: 100%;
-            border-radius: 18px;
-            background: linear-gradient(180deg, rgba(255,255,255,.68), rgba(248,250,252,.92));
-            border: 1px solid rgba(226,232,240,.9);
         }
-        .allocation-layout {
-            display: flex;
-            flex-direction: column;
-            gap: 0;
-        }
-        .chart-wrapper--pie {
-            height: 382px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 14px 16px 10px;
-        }
-        .chart-wrapper--bar {
-            height: 382px;
-            padding: 14px 16px 10px;
-        }
-        .chart-wrapper canvas {
-            width: 100% !important;
-            height: 100% !important;
-        }
+        .chart-wrapper canvas { width: 100% !important; }
 
         /* ===== Tables ===== */
         table {
@@ -254,9 +284,21 @@
         }
         tbody tr:nth-child(even) { background: #f9fafb; }
         tbody tr:hover { background: #f0f4ff; }
+        tbody tr.candle-row { cursor: pointer; }
 
         .positive { color: #16a34a; font-weight: 600; }
         .negative { color: #dc2626; font-weight: 600; }
+        .price-meta {
+            color: #64748b;
+            font-size: 11px;
+            margin-top: 3px;
+        }
+        .stale-badge {
+            color: #b45309;
+            background: #fef3c7;
+            border-radius: 999px;
+            padding: 1px 6px;
+        }
 
         /* ===== Buttons ===== */
         .btn {
@@ -353,18 +395,109 @@
             display: none;
         }
 
-        /* ===== Hover Chart ===== */
-        .hover-chart {
-            display: none;
-            position: fixed;
-            z-index: 150;
-            background: #fff;
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0,0,0,.15);
-            padding: 12px;
-            width: 280px;
-            height: 180px;
+        .candle-modal {
+            width: 960px;
+            max-width: 94vw;
+            padding: 24px;
         }
+        .candle-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .candle-modal-header h3 { margin: 0 0 5px; }
+        .candle-subtitle { color: #64748b; font-size: 13px; }
+        .candle-interval-tabs {
+            display: inline-flex;
+            gap: 4px;
+            padding: 4px;
+            margin-bottom: 12px;
+            border-radius: 9px;
+            background: #f1f5f9;
+        }
+        .candle-interval-tab {
+            border: 0;
+            border-radius: 7px;
+            padding: 6px 16px;
+            color: #64748b;
+            background: transparent;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .candle-interval-tab:hover { color: #1d4ed8; }
+        .candle-interval-tab.active {
+            color: #1d4ed8;
+            background: #fff;
+            box-shadow: 0 1px 4px rgba(15,23,42,.12);
+        }
+        .candle-close {
+            border: 0;
+            background: #f1f5f9;
+            border-radius: 8px;
+            width: 34px;
+            height: 34px;
+            cursor: pointer;
+            font-size: 20px;
+            color: #475569;
+        }
+        .candle-chart-wrap {
+            position: relative;
+            min-height: 430px;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #fff;
+        }
+        #candleCanvas {
+            display: block;
+            width: 100%;
+            height: 430px;
+            cursor: crosshair;
+        }
+        .candle-tooltip {
+            display: none;
+            position: absolute;
+            z-index: 3;
+            min-width: 190px;
+            padding: 10px 12px;
+            border: 1px solid #dbeafe;
+            border-radius: 9px;
+            color: #334155;
+            background: rgba(255,255,255,.97);
+            box-shadow: 0 6px 20px rgba(15,23,42,.16);
+            pointer-events: none;
+            font-size: 12px;
+        }
+        .candle-tooltip-title {
+            margin-bottom: 7px;
+            color: #0f172a;
+            font-weight: 700;
+        }
+        .candle-tooltip-grid {
+            display: grid;
+            grid-template-columns: auto auto;
+            gap: 4px 14px;
+        }
+        .candle-tooltip-grid span:nth-child(even) {
+            color: #0f172a;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        .candle-status {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #64748b;
+            background: rgba(255,255,255,.92);
+            padding: 24px;
+            text-align: center;
+        }
+        .candle-status.error { color: #dc2626; }
 
         /* ===== Empty State ===== */
         .empty-state {
@@ -385,13 +518,22 @@
         @media (max-width: 768px) {
             .stat-row { grid-template-columns: 1fr; }
             .chart-row { grid-template-columns: 1fr; }
-            .chart-panel-head { grid-template-columns: 1fr; }
-            .chart-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .chart-wrapper--pie { height: 336px; }
-            .chart-wrapper--bar { height: 336px; }
+            .assistant-msg-charts { grid-template-columns: 1fr; }
             .stat-card .value { font-size: 24px; }
             table { font-size: 12px; }
             thead th, tbody td { padding: 8px 6px; }
+            .assistant-shell {
+                padding: 16px;
+                border-radius: 16px;
+                height: calc(100vh - 100px);
+                min-height: 560px;
+            }
+            .assistant-head h3 { font-size: 20px; }
+            .assistant-input-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .assistant-send { width: 100%; }
         }
     </style>
 </head>
@@ -402,6 +544,7 @@
     <div class="brand">Portfolio Manager</div>
     <button class="tab-btn active" data-tab="overview">组合总览</button>
     <button class="tab-btn" data-tab="operations">投资操作</button>
+    <button class="tab-btn" data-tab="assistant">Invest Assistant</button>
 </nav>
 
 <div class="container">
@@ -436,31 +579,15 @@
             </div>
         </div>
         <div class="chart-row">
-            <div class="card chart-card chart-card--allocation">
-                <div class="chart-panel-head">
-                    <div class="chart-panel-copy">
-                        <div class="eyebrow">Allocation</div>
-                        <div class="card-title">资产分配</div>
-                        <div class="card-subtitle">查看组合资产结构分布。</div>
-                    </div>
-                    <div class="chart-meta" id="allocation-meta"></div>
-                </div>
-                <div class="allocation-layout">
-                    <div class="chart-wrapper chart-wrapper--pie">
-                        <canvas id="pieChart"></canvas>
-                    </div>
+            <div class="card">
+                <div class="card-title">资产分配</div>
+                <div class="chart-wrapper">
+                    <canvas id="pieChart"></canvas>
                 </div>
             </div>
-            <div class="card chart-card">
-                <div class="chart-panel-head">
-                    <div class="chart-panel-copy">
-                        <div class="eyebrow">Performance</div>
-                        <div class="card-title">近七日浮盈走势</div>
-                        <div class="card-subtitle">柱状展示绝对收益，折线展示收益率，便于同时观察方向和幅度。</div>
-                    </div>
-                    <div class="chart-meta" id="performance-meta"></div>
-                </div>
-                <div class="chart-wrapper chart-wrapper--bar">
+            <div class="card">
+                <div class="card-title">每日收益</div>
+                <div class="chart-wrapper">
                     <canvas id="barLineChart"></canvas>
                 </div>
             </div>
@@ -481,6 +608,39 @@
             <div class="card-title">市场标的</div>
             <div id="stocks-content">
                 <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 3: Invest Assistant -->
+    <div id="tab-assistant" class="tab-content">
+        <div class="assistant-shell">
+            <div class="assistant-head">
+                <h3>Invest Assistant</h3>
+                <p>The following answers are generated by a large language model and are for reference only.</p>
+            </div>
+
+            <div id="assistant-messages" class="assistant-messages"></div>
+
+            <div class="assistant-input-row">
+                <textarea id="assistant-input" rows="1" placeholder="For example: please suggest a rebalance plan based on my current holdings"></textarea>
+                <button id="assistant-send" class="assistant-send">Send</button>
+            </div>
+            <div id="assistant-error" class="assistant-error" style="display:none"></div>
+
+            <div class="assistant-insights">
+                <div class="assistant-chart-card">
+                    <h4>当前资产分配</h4>
+                    <div class="assistant-chart-wrap"><canvas id="assistantPieChart"></canvas></div>
+                </div>
+                <div class="assistant-chart-card">
+                    <h4>持仓盈亏率</h4>
+                    <div class="assistant-chart-wrap"><canvas id="assistantBarChart"></canvas></div>
+                </div>
+                <div class="assistant-chart-card">
+                    <h4>7天组合表现</h4>
+                    <div class="assistant-chart-wrap"><canvas id="assistantLineChart"></canvas></div>
+                </div>
             </div>
         </div>
     </div>
@@ -517,9 +677,36 @@
     </div>
 </div>
 
-<!-- Hover Chart -->
-<div class="hover-chart" id="hoverChart">
-    <canvas id="hoverChartCanvas"></canvas>
+<!-- Candlestick Modal -->
+<div class="modal-overlay" id="candleModal">
+    <div class="modal candle-modal">
+        <div class="candle-modal-header">
+            <div>
+                <h3 id="candle-title">K 线</h3>
+                <div class="candle-subtitle" id="candle-subtitle">加载中...</div>
+            </div>
+            <button class="candle-close" id="candle-close" aria-label="关闭">&times;</button>
+        </div>
+        <div class="candle-interval-tabs" role="tablist" aria-label="K线周期">
+            <button class="candle-interval-tab active" id="candle-tab-daily"
+                    type="button" role="tab" aria-controls="candle-panel"
+                    aria-selected="true" tabindex="0" data-interval="DAILY">日线</button>
+            <button class="candle-interval-tab" id="candle-tab-weekly"
+                    type="button" role="tab" aria-controls="candle-panel"
+                    aria-selected="false" tabindex="-1" data-interval="WEEKLY">周线</button>
+            <button class="candle-interval-tab" id="candle-tab-monthly"
+                    type="button" role="tab" aria-controls="candle-panel"
+                    aria-selected="false" tabindex="-1" data-interval="MONTHLY">月线</button>
+        </div>
+        <div class="candle-chart-wrap" id="candle-panel" role="tabpanel"
+             aria-labelledby="candle-tab-daily" tabindex="0">
+            <canvas id="candleCanvas"></canvas>
+            <div class="candle-tooltip" id="candleTooltip"></div>
+            <div class="candle-status" id="candle-status" role="status" aria-live="polite">
+                正在加载日 K 数据...
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -537,30 +724,49 @@ const dataLoaded = { overview: false, operations: false };
 // ---------- Chart instances ----------
 let pieChartInstance = null;
 let barLineChartInstance = null;
-let hoverChartInstance = null;
+let assistantPieChartInstance = null;
+let assistantBarChartInstance = null;
+let assistantLineChartInstance = null;
+
+// ---------- Assistant state ----------
+let assistantSending = false;
+let assistantInputAutoGrowBound = false;
+const assistantHistory = [
+    {
+        role: 'assistant',
+        content: 'Hello, I am your investment assistant. You can ask me about portfolio risk, rebalancing ideas, and position-building directions.'
+    }
+];
 
 // ---------- Helpers ----------
 function fmt(n) {
+    if (n === null || n === undefined) return '--';
     return '$' + Number(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 function fmtPct(n) {
+    if (n === null || n === undefined) return '--';
     return (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%';
 }
 function pnlClass(n) { return n >= 0 ? 'positive' : 'negative'; }
 function escapeHtml(value) {
-     return String(value).replace(/[&<>"']/g, ch => ({
-         '&': '&amp;',
-         '<': '&lt;',
-         '>': '&gt;',
-         '"': '&quot;',
-         "'": '&#39;'
-     }[ch]));
- }
-function createMetricPill(label, value, className) {
-    const safeLabel = escapeHtml(label);
-    const safeValue = escapeHtml(value);
-    return '<div class="metric-pill' + (className ? ' ' + className : '') + '"><span class="k">' + safeLabel + '</span><span class="v">' + safeValue + '</span></div>';
+    const text = value === null || value === undefined ? '' : String(value);
+    return text.replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[char]);
 }
+
+function autoGrowAssistantInput() {
+    const input = document.getElementById('assistant-input');
+    if (!input) return;
+    input.style.height = 'auto';
+    const maxHeight = 180;
+    input.style.height = Math.min(input.scrollHeight, maxHeight) + 'px';
+}
+
 // ---------- Tab switching ----------
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -571,6 +777,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.getElementById('tab-' + tab).classList.add('active');
         if (tab === 'overview' && !dataLoaded.overview) loadOverview();
         if (tab === 'operations' && !dataLoaded.operations) loadOperations();
+        if (tab === 'assistant') initAssistantTab();
     });
 });
 
@@ -587,9 +794,8 @@ async function loadOverview(force) {
         weeklyData = wkRes;
 
         renderStatCards(); // 用 overviewData 渲染顶部的4个统计卡片（总值/总盈亏/日盈亏/现金）
-        renderOverviewInsights();
         renderPieChart();  // 用 overviewData.allocation 画资产分配饼图
-        renderBarLineChart();   // 用 weeklyData 画7天浮盈柱状+折线图
+        renderBarLineChart();   // 用 weeklyData 画7天收益柱状+折线图
         dataLoaded.overview = true; //标记总览页数据已加载完成
 
 
@@ -628,32 +834,6 @@ function renderStatCards() {
     document.getElementById('stat-dividend-pending-sub').textContent = divPending > 0 ? '待派息日到账' : '暂无待到账分红';
 }
 
-function renderOverviewInsights() {
-    const allocationMeta = document.getElementById('allocation-meta');
-    const performanceMeta = document.getElementById('performance-meta');
-
-    const allocation = (overviewData && overviewData.allocation) || [];
-    const allocationTotal = allocation.reduce((sum, item) => sum + Number(item.value || 0), 0);
-    const dominant = allocation.slice().sort((a, b) => (b.value || 0) - (a.value || 0))[0];
-    const dominantPct = dominant && allocationTotal > 0 ? ((dominant.value || 0) / allocationTotal * 100).toFixed(1) + '%' : '--';
-    allocationMeta.innerHTML = [
-        createMetricPill('资产类别', String(allocation.length || 0)),
-        createMetricPill('最大权重', dominant ? dominant.assetType : '--'),
-        createMetricPill('占比', dominantPct)
-    ].join('');
-
-    const performance = weeklyData || [];
-    const latest = performance.length ? performance[performance.length - 1] : null;
-    const avgReturn = performance.length
-        ? performance.reduce((sum, item) => sum + Number(item.returnRate || 0), 0) / performance.length
-        : 0;
-    performanceMeta.innerHTML = [
-        createMetricPill('观察窗口', performance.length ? performance.length + ' 天' : '--'),
-        createMetricPill('最新浮盈', latest ? fmt(latest.dailyProfit || 0) : '--'),
-        createMetricPill('平均收益率', performance.length ? fmtPct(avgReturn) : '--')
-    ].join('');
-}
-
 function renderPieChart() {
     const d = overviewData;
     const colorMap = { 'STOCK': '#3b82f6', 'BOND': '#22c55e', 'CASH': '#f97316' };
@@ -669,22 +849,15 @@ function renderPieChart() {
             datasets: [{
                 data: values,
                 backgroundColor: colors,
-                borderWidth: 3,
-                borderColor: '#fff',
-                radius: '82%'
+                borderWidth: 2,
+                borderColor: '#fff'
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
-            layout: { padding: { top: 2, bottom: 2, left: 2, right: 2 } },
             plugins: {
-                legend: { display: false },
+                legend: { position: 'bottom', labels: { padding: 16, font: { size: 13 } } },
                 tooltip: {
-                    backgroundColor: 'rgba(15,23,42,.92)',
-                    titleColor: '#f8fafc',
-                    bodyColor: '#e2e8f0',
-                    padding: 12,
                     callbacks: {
                         label: ctx => {
                             const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
@@ -721,17 +894,15 @@ function renderBarLineChart() {
             labels,
             datasets: [
                 {
-                    label: '每日浮盈',
+                    label: '每日收益',
                     data: pnlData,
                     backgroundColor: pnlData.map(v => v >= 0 ? 'rgba(34,197,94,.7)' : 'rgba(239,68,68,.7)'),
                     borderRadius: 4,
-                    barThickness: 36,
-                    maxBarThickness: 42,
                     yAxisID: 'y',
                     order: 2
                 },
                 {
-                    label: '浮盈率',
+                    label: '收益率',
                     data: retData,
                     type: 'line',
                     borderColor: '#8b5cf6',
@@ -747,46 +918,18 @@ function renderBarLineChart() {
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
-            layout: { padding: { top: 8, bottom: 0, left: 2, right: 6 } },
             interaction: { mode: 'index', intersect: false },
             scales: {
-                x: {
-                    grid: { display: false },
-                    ticks: { maxRotation: 0, minRotation: 0, color: '#475569', font: { size: 12, weight: '600' } }
-                },
-                y: {
-                    position: 'left',
-                    title: { display: true, text: '浮盈 ($)', color: '#64748b', font: { size: 12, weight: '700' } },
-                    ticks: { color: '#64748b' },
-                    grid: { color: 'rgba(226,232,240,.9)' },
-                    grace: '10%'
-                },
+                y: { position: 'left', title: { display: true, text: '收益 ($)' } },
                 y1: {
                     position: 'right',
-                    title: { display: true, text: '浮盈率 (%)', color: '#64748b', font: { size: 12, weight: '700' } },
+                    title: { display: true, text: '收益率 (%)' },
                     grid: { drawOnChartArea: false },
-                    ticks: { callback: v => v + '%', color: '#64748b' }
+                    ticks: { callback: v => v + '%' }
                 }
             },
             plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        padding: 10,
-                        boxWidth: 12,
-                        useBorderRadius: true,
-                        borderRadius: 4,
-                        color: '#334155',
-                        font: { size: 12, weight: '600' }
-                    }
-                },
-                tooltip: {
-                    backgroundColor: 'rgba(15,23,42,.92)',
-                    titleColor: '#f8fafc',
-                    bodyColor: '#e2e8f0',
-                    padding: 12
-                }
+                legend: { position: 'bottom', labels: { padding: 16 } }
             }
         }
     });
@@ -823,19 +966,26 @@ function renderHoldings() {
     html += '</tr></thead><tbody>';
     holdingsData.forEach(h => {
         const cls = pnlClass(h.profit || 0);
-        html += '<tr>';
-        html += '<td><strong>' + h.symbol + '</strong></td>';
-        html += '<td>' + h.name + '</td>';
-        html += '<td>' + (h.assetType || '--') + '</td>';
-        html += '<td>' + h.quantity + '</td>';
+        const stockId = Number(h.stockId);
+        const validStockId = Number.isSafeInteger(stockId) && stockId > 0;
+        const canShowCandles = h.assetType !== 'CASH' && validStockId;
+        html += '<tr' + (canShowCandles
+            ? ' class="candle-row" data-candle-stock-id="' + stockId + '"'
+            : '') + '>';
+        html += '<td><strong>' + escapeHtml(h.symbol) + '</strong></td>';
+        html += '<td>' + escapeHtml(h.name) + '</td>';
+        html += '<td>' + escapeHtml(h.assetType || '--') + '</td>';
+        html += '<td>' + escapeHtml(h.quantity) + '</td>';
         html += '<td>' + fmt(h.averageCost) + '</td>';
         html += '<td>' + fmt(h.currentPrice) + '</td>';
         html += '<td class="' + cls + '">' + fmt(h.profit) + '</td>';
         html += '<td class="' + cls + '">' + fmtPct(h.profitPercent) + '</td>';
         html += '<td style="color:#10b981">$' + (h.cumulativeDividend || 0).toFixed(2) + '</td>';
         html += '<td><div class="btn-group">';
-        html += '<button class="btn btn-buy btn-sm" onclick="openTrade(\'' + h.symbol + '\',' + h.stockId + ',\'BUY\')">买入</button>';
-        html += '<button class="btn btn-sell btn-sm" onclick="openTrade(\'' + h.symbol + '\',' + h.stockId + ',\'SELL\')">卖出</button>';
+        html += '<button class="btn btn-buy btn-sm" data-trade-stock-id="' + stockId
+            + '" data-trade-type="BUY">买入</button>';
+        html += '<button class="btn btn-sell btn-sm" data-trade-stock-id="' + stockId
+            + '" data-trade-type="SELL">卖出</button>';
         html += '</div></td>';
         html += '</tr>';
     });
@@ -856,88 +1006,364 @@ function renderStocks() {
     stocksData.forEach(s => {
         const chg = s.changePercent || 0;
         const cls = pnlClass(chg);
-        html += '<tr class="stock-row" data-stock-id="' + s.id + '">';
-        html += '<td><strong>' + s.symbol + '</strong></td>';
-        html += '<td>' + s.name + '</td>';
-        html += '<td>' + (s.assetType || '--') + '</td>';
-        html += '<td>' + (s.sector || '--') + '</td>';
-        html += '<td>' + fmt(s.currentPrice) + '</td>';
+        const stockId = Number(s.id);
+        const validStockId = Number.isSafeInteger(stockId) && stockId > 0;
+        const canShowCandles = s.assetType !== 'CASH' && validStockId;
+        html += '<tr' + (canShowCandles
+            ? ' class="candle-row" data-candle-stock-id="' + stockId + '"'
+            : '') + '>';
+        html += '<td><strong>' + escapeHtml(s.symbol) + '</strong></td>';
+        html += '<td>' + escapeHtml(s.name) + '</td>';
+        html += '<td>' + escapeHtml(s.assetType || '--') + '</td>';
+        html += '<td>' + escapeHtml(s.sector || '--') + '</td>';
+        html += '<td>' + fmt(s.currentPrice);
+        if (s.priceDate) {
+            html += '<div class="price-meta">截至 ' + escapeHtml(s.priceDate) + ' · '
+                + escapeHtml(s.priceSource || '--');
+            if (s.stale) html += ' · <span class="stale-badge">可能过期</span>';
+            html += '</div>';
+        } else if (s.assetType !== 'CASH') {
+            html += '<div class="price-meta"><span class="stale-badge">行情未同步</span></div>';
+        }
+        html += '</td>';
         html += '<td class="' + cls + '">' + fmtPct(chg) + '</td>';
-        html += '<td><button class="btn btn-buy btn-sm" onclick="openTrade(\'' + s.symbol + '\',' + s.id + ',\'BUY\')">买入</button></td>';
+        html += '<td><button class="btn btn-buy btn-sm" data-trade-stock-id="' + stockId
+            + '" data-trade-type="BUY"'
+            + (s.currentPrice == null ? ' disabled title="行情未同步"' : '')
+            + '>买入</button></td>';
         html += '</tr>';
     });
     html += '</tbody></table>';
     el.innerHTML = html;
-    attachHoverEvents();
 }
 
-/* ================================================================
-   Hover Chart – 7-day price
-   ================================================================ */
-let hoverTimeout = null;
+function findOperationStock(stockId) {
+    return (stocksData || []).find(stock => Number(stock.id) === stockId)
+        || (holdingsData || []).find(holding => Number(holding.stockId) === stockId);
+}
 
-function attachHoverEvents() {
-    document.querySelectorAll('.stock-row').forEach(row => {
-        row.addEventListener('mouseenter', function (e) {
-            const stockId = this.dataset.stockId;
-            clearTimeout(hoverTimeout);
-            hoverTimeout = setTimeout(() => showHoverChart(stockId, e), 350);
-        });
-        row.addEventListener('mouseleave', () => {
-            clearTimeout(hoverTimeout);
-            hideHoverChart();
-        });
+function handleOperationsClick(event) {
+    const container = event.currentTarget;
+    const tradeButton = event.target.closest('button[data-trade-stock-id]');
+    if (tradeButton && container.contains(tradeButton)) {
+        event.stopPropagation();
+        if (tradeButton.disabled) return;
+        const stockId = Number(tradeButton.dataset.tradeStockId);
+        const type = tradeButton.dataset.tradeType;
+        const stock = findOperationStock(stockId);
+        if (stock && (type === 'BUY' || type === 'SELL')) {
+            openTrade(stock.symbol, stockId, type);
+        }
+        return;
+    }
+
+    const candleRow = event.target.closest('tr[data-candle-stock-id]');
+    if (!candleRow || !container.contains(candleRow)) return;
+    const stockId = Number(candleRow.dataset.candleStockId);
+    const stock = findOperationStock(stockId);
+    if (stock) {
+        openCandles(stockId, stock.symbol, stock.name);
+    }
+}
+
+document.getElementById('holdings-content').addEventListener('click', handleOperationsClick);
+document.getElementById('stocks-content').addEventListener('click', handleOperationsClick);
+
+/* ================================================================
+   Candlestick Modal
+   ================================================================ */
+const CANDLE_INTERVALS = {
+    DAILY: { label: '日线', limit: 120 },
+    WEEKLY: { label: '周线', limit: 52 },
+    MONTHLY: { label: '月线', limit: 60 }
+};
+let candleAbortController = null;
+let candleSeriesData = null;
+let candleModalStock = null;
+let candleCurrentInterval = 'DAILY';
+let candleChartLayout = null;
+
+function openCandles(stockId, symbol, name) {
+    if (candleAbortController) candleAbortController.abort();
+    candleModalStock = { stockId, symbol, name };
+    candleCurrentInterval = 'DAILY';
+    candleSeriesData = null;
+    candleChartLayout = null;
+
+    document.getElementById('candle-title').textContent = symbol + ' · ' + name;
+    setActiveCandleTab(candleCurrentInterval);
+    hideCandleTooltip();
+    document.getElementById('candleModal').classList.add('show');
+    loadCandleSeries(candleCurrentInterval);
+}
+
+async function loadCandleSeries(interval) {
+    if (!candleModalStock || !CANDLE_INTERVALS[interval]) return;
+    if (candleAbortController) candleAbortController.abort();
+    const controller = new AbortController();
+    candleAbortController = controller;
+    candleCurrentInterval = interval;
+    candleSeriesData = null;
+    candleChartLayout = null;
+    setActiveCandleTab(interval);
+    hideCandleTooltip();
+    clearCandleCanvas();
+
+    const config = CANDLE_INTERVALS[interval];
+    document.getElementById('candle-subtitle').textContent = config.label + ' · 正在加载';
+    const status = document.getElementById('candle-status');
+    status.className = 'candle-status';
+    status.textContent = '正在加载' + config.label + ' K 数据...';
+    status.style.display = 'flex';
+
+    try {
+        const response = await fetch(
+            '/api/stocks/' + candleModalStock.stockId + '/candles?interval='
+                + interval + '&limit=' + config.limit,
+            { signal: controller.signal }
+        );
+        if (!response.ok) {
+            throw new Error(config.label + ' K 数据请求失败（' + response.status + '）');
+        }
+        if (controller !== candleAbortController) return;
+        candleSeriesData = await response.json();
+        if (!candleSeriesData.candles || candleSeriesData.candles.length === 0) {
+            status.textContent = '暂无历史行情，请先执行行情回填。';
+            document.getElementById('candle-subtitle').textContent = config.label + ' · 暂无数据';
+            return;
+        }
+        document.getElementById('candle-subtitle').textContent =
+            config.label + ' · 数据截至 ' + candleSeriesData.asOf + ' · '
+                + (candleSeriesData.source || '--');
+        status.style.display = 'none';
+        requestAnimationFrame(() => drawCandles(candleSeriesData.candles));
+    } catch (error) {
+        if (error.name === 'AbortError') return;
+        if (controller !== candleAbortController) return;
+        status.className = 'candle-status error';
+        status.textContent = error.message || config.label + ' K 数据加载失败';
+        document.getElementById('candle-subtitle').textContent = config.label + ' · 加载失败';
+    } finally {
+        if (candleAbortController === controller) {
+            candleAbortController = null;
+        }
+    }
+}
+
+function closeCandles() {
+    if (candleAbortController) {
+        candleAbortController.abort();
+        candleAbortController = null;
+    }
+    candleSeriesData = null;
+    candleModalStock = null;
+    candleChartLayout = null;
+    hideCandleTooltip();
+    document.getElementById('candleModal').classList.remove('show');
+    clearCandleCanvas();
+}
+
+function setActiveCandleTab(interval) {
+    const panel = document.getElementById('candle-panel');
+    document.querySelectorAll('.candle-interval-tab').forEach(button => {
+        const active = button.dataset.interval === interval;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+        button.tabIndex = active ? 0 : -1;
+        if (active) {
+            panel.setAttribute('aria-labelledby', button.id);
+        }
     });
 }
 
-async function showHoverChart(stockId, event) {
-    const container = document.getElementById('hoverChart');
-    const rect = event.currentTarget.getBoundingClientRect();
-    container.style.display = 'block';
-    container.style.left = (rect.right + 10) + 'px';
-    container.style.top = rect.top + 'px';
-    // Check if fits on right, else show on left
-    if (rect.right + 300 > window.innerWidth) {
-        container.style.left = (rect.left - 290) + 'px';
-    }
-    try {
-        const data = await fetch('/api/stocks/' + stockId + '/prices').then(r => r.json());
-        const ctx = document.getElementById('hoverChartCanvas').getContext('2d');
-        if (hoverChartInstance) hoverChartInstance.destroy();
-        hoverChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.map(d => String(d.date)),
-                datasets: [{
-                    data: data.map(d => d.closePrice),
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59,130,246,.08)',
-                    fill: true,
-                    tension: .3,
-                    pointRadius: 3,
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false }, tooltip: { enabled: true } },
-                scales: {
-                    x: { ticks: { font: { size: 10 } } },
-                    y: { ticks: { font: { size: 10 } } }
-                }
-            }
-        });
-    } catch (e) {
-        container.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px;">暂无数据</p>';
-    }
+function clearCandleCanvas() {
+    const canvas = document.getElementById('candleCanvas');
+    canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
 }
 
-function hideHoverChart() {
-    const container = document.getElementById('hoverChart');
-    container.style.display = 'none';
-    container.innerHTML = '<canvas id="hoverChartCanvas"></canvas>';
+function drawCandles(candles) {
+    const canvas = document.getElementById('candleCanvas');
+    const rect = canvas.getBoundingClientRect();
+    const ratio = window.devicePixelRatio || 1;
+    const width = Math.max(360, rect.width);
+    const height = 430;
+    canvas.width = Math.floor(width * ratio);
+    canvas.height = Math.floor(height * ratio);
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(ratio, ratio);
+    ctx.clearRect(0, 0, width, height);
+
+    const margin = { top: 24, right: 70, bottom: 42, left: 18 };
+    const plotWidth = width - margin.left - margin.right;
+    const plotHeight = height - margin.top - margin.bottom;
+    const prices = candles.flatMap(c => [Number(c.high), Number(c.low)]);
+    let minPrice = Math.min(...prices);
+    let maxPrice = Math.max(...prices);
+    const padding = Math.max((maxPrice - minPrice) * 0.08, maxPrice * 0.005);
+    minPrice -= padding;
+    maxPrice += padding;
+    const priceRange = maxPrice - minPrice || 1;
+    const y = value => margin.top + (maxPrice - Number(value)) / priceRange * plotHeight;
+
+    ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.fillStyle = '#64748b';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 5; i++) {
+        const py = margin.top + plotHeight * i / 5;
+        const label = (maxPrice - priceRange * i / 5).toFixed(2);
+        ctx.beginPath();
+        ctx.moveTo(margin.left, py);
+        ctx.lineTo(width - margin.right, py);
+        ctx.stroke();
+        ctx.fillText(label, width - margin.right + 8, py + 4);
+    }
+
+    const step = plotWidth / candles.length;
+    const bodyWidth = Math.max(2, Math.min(10, step * 0.62));
+    candleChartLayout = { candles, margin, plotWidth, plotHeight, step, width, height };
+    candles.forEach((candle, index) => {
+        const x = margin.left + step * (index + 0.5);
+        const openY = y(candle.open);
+        const closeY = y(candle.close);
+        const highY = y(candle.high);
+        const lowY = y(candle.low);
+        const rising = Number(candle.close) >= Number(candle.open);
+        const color = rising ? '#16a34a' : '#dc2626';
+
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.moveTo(x, highY);
+        ctx.lineTo(x, lowY);
+        ctx.stroke();
+
+        const bodyTop = Math.min(openY, closeY);
+        const bodyHeight = Math.max(1.5, Math.abs(closeY - openY));
+        ctx.fillRect(x - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
+    });
+
+    const labelEvery = Math.max(1, Math.ceil(candles.length / 7));
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = 'center';
+    candles.forEach((candle, index) => {
+        if (index % labelEvery !== 0 && index !== candles.length - 1) return;
+        const x = margin.left + step * (index + 0.5);
+        const date = String(candle.date);
+        const label = candleCurrentInterval === 'MONTHLY' ? date.slice(0, 7) : date.slice(5);
+        ctx.fillText(label, x, height - 16);
+    });
+    ctx.textAlign = 'start';
 }
+
+function showCandleTooltip(candle, event) {
+    const tooltip = document.getElementById('candleTooltip');
+    const wrap = document.querySelector('.candle-chart-wrap');
+    const open = Number(candle.open);
+    const close = Number(candle.close);
+    const change = close - open;
+    const changePercent = open === 0 ? 0 : change / open * 100;
+    const changeClass = change >= 0 ? 'positive' : 'negative';
+    const changeText = (change >= 0 ? '+' : '') + change.toFixed(2)
+        + ' (' + (changePercent >= 0 ? '+' : '') + changePercent.toFixed(2) + '%)';
+    const period = candleCurrentInterval === 'MONTHLY'
+        ? String(candle.date).slice(0, 7)
+        : String(candle.date);
+
+    tooltip.innerHTML =
+        '<div class="candle-tooltip-title">'
+            + escapeHtml(CANDLE_INTERVALS[candleCurrentInterval].label)
+            + ' · ' + escapeHtml(period) + '</div>'
+        + '<div class="candle-tooltip-grid">'
+        + '<span>开盘</span><span>' + escapeHtml(Number(candle.open).toFixed(2)) + '</span>'
+        + '<span>最高</span><span>' + escapeHtml(Number(candle.high).toFixed(2)) + '</span>'
+        + '<span>最低</span><span>' + escapeHtml(Number(candle.low).toFixed(2)) + '</span>'
+        + '<span>收盘</span><span>' + escapeHtml(Number(candle.close).toFixed(2)) + '</span>'
+        + '<span>复权收盘</span><span>'
+            + escapeHtml(Number(candle.adjustedClose).toFixed(2)) + '</span>'
+        + '<span>涨跌</span><span class="' + changeClass + '">'
+            + escapeHtml(changeText) + '</span>'
+        + '<span>成交量</span><span>'
+            + escapeHtml(Number(candle.volume).toLocaleString('zh-CN')) + '</span>'
+        + '</div>';
+    tooltip.style.display = 'block';
+
+    const wrapRect = wrap.getBoundingClientRect();
+    const pointerX = event.clientX - wrapRect.left;
+    const pointerY = event.clientY - wrapRect.top;
+    let left = pointerX + 14;
+    let top = pointerY + 14;
+    if (left + tooltip.offsetWidth > wrap.clientWidth - 8) {
+        left = pointerX - tooltip.offsetWidth - 14;
+    }
+    if (top + tooltip.offsetHeight > wrap.clientHeight - 8) {
+        top = pointerY - tooltip.offsetHeight - 14;
+    }
+    tooltip.style.left = Math.max(8, left) + 'px';
+    tooltip.style.top = Math.max(8, top) + 'px';
+}
+
+function hideCandleTooltip() {
+    const tooltip = document.getElementById('candleTooltip');
+    if (tooltip) tooltip.style.display = 'none';
+}
+
+document.querySelectorAll('.candle-interval-tab').forEach(button => {
+    button.addEventListener('click', () => {
+        const interval = button.dataset.interval;
+        if (interval !== candleCurrentInterval) {
+            loadCandleSeries(interval);
+        }
+    });
+    button.addEventListener('keydown', event => {
+        const tabs = Array.from(document.querySelectorAll('.candle-interval-tab'));
+        const currentIndex = tabs.indexOf(button);
+        let nextIndex = null;
+        if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length;
+        if (event.key === 'ArrowLeft') nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        if (event.key === 'Home') nextIndex = 0;
+        if (event.key === 'End') nextIndex = tabs.length - 1;
+        if (nextIndex === null) return;
+        event.preventDefault();
+        tabs[nextIndex].focus();
+        tabs[nextIndex].click();
+    });
+});
+
+document.getElementById('candleCanvas').addEventListener('mousemove', event => {
+    if (!candleChartLayout || !candleChartLayout.candles.length) {
+        hideCandleTooltip();
+        return;
+    }
+    const canvas = event.currentTarget;
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * candleChartLayout.width / rect.width;
+    const y = (event.clientY - rect.top) * candleChartLayout.height / rect.height;
+    const { margin, plotWidth, plotHeight, step, candles } = candleChartLayout;
+    if (x < margin.left || x > margin.left + plotWidth
+            || y < margin.top || y > margin.top + plotHeight) {
+        hideCandleTooltip();
+        return;
+    }
+    const index = Math.min(
+        candles.length - 1,
+        Math.max(0, Math.floor((x - margin.left) / step))
+    );
+    showCandleTooltip(candles[index], event);
+});
+document.getElementById('candleCanvas').addEventListener('mouseleave', hideCandleTooltip);
+
+document.getElementById('candle-close').addEventListener('click', closeCandles);
+document.getElementById('candleModal').addEventListener('click', event => {
+    if (event.target === event.currentTarget) closeCandles();
+});
+window.addEventListener('resize', () => {
+    hideCandleTooltip();
+    if (candleSeriesData && document.getElementById('candleModal').classList.contains('show')) {
+        drawCandles(candleSeriesData.candles);
+    }
+});
 
 /* ================================================================
    Trade Modal
@@ -1058,6 +1484,410 @@ document.getElementById('modal-confirm').addEventListener('click', async () => {
    Init
    ================================================================ */
 loadOverview();
+
+/* ================================================================
+    Tab 3 – Invest Assistant
+   ================================================================ */
+function initAssistantTab() {
+    renderAssistantMessages();
+    if (!assistantInputAutoGrowBound) {
+        const input = document.getElementById('assistant-input');
+        if (input) {
+            input.addEventListener('input', autoGrowAssistantInput);
+            input.addEventListener('keydown', handleAssistantInputKeydown);
+            assistantInputAutoGrowBound = true;
+        }
+    }
+    autoGrowAssistantInput();
+}
+
+function handleAssistantInputKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendAssistantMessage();
+    }
+}
+
+function renderAssistantMessages() {
+    const box = document.getElementById('assistant-messages');
+    if (!box) return;
+    box.querySelectorAll('canvas').forEach(canvas => {
+        const chart = Chart.getChart(canvas);
+        if (chart) chart.destroy();
+    });
+    box.innerHTML = assistantHistory
+        .map((m, index) => {
+            let html = '<div class="assistant-msg ' + m.role + '">';
+            html += escapeHtml(m.content || '');
+            if (m.role === 'assistant' && hasRenderableCharts(m.charts)) {
+                html += renderAssistantMessageChartsMarkup(index, m.charts, m.locale || 'en');
+            }
+            html += '</div>';
+            return html;
+        })
+        .join('');
+    renderAssistantMessageCharts();
+    box.scrollTop = box.scrollHeight;
+}
+
+function renderAssistantMessageChartsMarkup(index, charts, locale) {
+    const selectedCharts = selectAssistantCharts(charts);
+    if (!selectedCharts.length) {
+        return '';
+    }
+
+    const allocationFallback = locale === 'zh' ? '建议持仓占比' : 'Recommended Allocation';
+    const driversFallback = locale === 'zh' ? '收益驱动因子' : 'Expected Return Drivers';
+    const forecastFallback = locale === 'zh' ? 'AI 预测盈亏走势' : 'AI Forecast Return Trend';
+    const allocationTitle = escapeHtml((charts.recommended_allocation && charts.recommended_allocation.title) || allocationFallback);
+    const driversTitle = escapeHtml((charts.expected_drivers && charts.expected_drivers.title) || driversFallback);
+    const forecastTitle = escapeHtml(forecastFallback);
+    const showLine = selectedCharts.includes('line');
+    const showPie = selectedCharts.includes('pie');
+    const showBar = selectedCharts.includes('bar');
+
+    return `
+        <div class="assistant-msg-charts">
+            ${showLine ? `<div class="assistant-msg-chart-card" style="${(showPie || showBar) ? 'grid-column: 1 / -1;' : ''}">
+                <h5>${forecastTitle}</h5>
+                <div class="assistant-msg-chart-wrap"><canvas id="assistant-msg-line-${index}"></canvas></div>
+            </div>` : ''}
+            ${showPie ? `<div class="assistant-msg-chart-card">
+                <h5>${allocationTitle}</h5>
+                <div class="assistant-msg-chart-wrap"><canvas id="assistant-msg-pie-${index}"></canvas></div>
+            </div>` : ''}
+            ${showBar ? `<div class="assistant-msg-chart-card" style="${showPie ? '' : 'grid-column: 1 / -1;'}">
+                <h5>${driversTitle}</h5>
+                <div class="assistant-msg-chart-wrap"><canvas id="assistant-msg-bar-${index}"></canvas></div>
+            </div>` : ''}
+        </div>
+    `;
+}
+
+function renderAssistantMessageCharts() {
+    assistantHistory.forEach((message, index) => {
+        if (!message.charts) return;
+
+        const pieCanvas = document.getElementById(`assistant-msg-pie-${index}`);
+        const barCanvas = document.getElementById(`assistant-msg-bar-${index}`);
+        const lineCanvas = document.getElementById(`assistant-msg-line-${index}`);
+
+        if (pieCanvas) {
+            assistantPieChartInstance = buildAllocationChart(pieCanvas.getContext('2d'), message.charts.recommended_allocation);
+        }
+        if (barCanvas) {
+            assistantBarChartInstance = buildDriversChart(barCanvas.getContext('2d'), message.charts.expected_drivers, message.locale || 'en');
+        }
+        if (lineCanvas) {
+            assistantLineChartInstance = buildForecastChart(
+                lineCanvas.getContext('2d'),
+                message.charts.current_portfolio_forecast,
+                message.charts.recommended_portfolio_forecast,
+                message.locale || 'en'
+            );
+        }
+    });
+}
+
+function detectAssistantLocale(text) {
+    const input = String(text || '');
+    const cjkCount = (input.match(/[\u4e00-\u9fff]/g) || []).length;
+    const latinCount = (input.match(/[A-Za-z]/g) || []).length;
+    return latinCount > cjkCount && latinCount > 3 ? 'en' : 'zh';
+}
+
+function escapeHtml(text) {
+    return String(text)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+async function sendAssistantMessage() {
+    const input = document.getElementById('assistant-input');
+    const sendBtn = document.getElementById('assistant-send');
+    const err = document.getElementById('assistant-error');
+
+    const text = (input.value || '').trim();
+    if (!text || assistantSending) return;
+
+    assistantSending = true;
+    sendBtn.disabled = true;
+    err.style.display = 'none';
+
+    const locale = detectAssistantLocale(text);
+    assistantHistory.push({ role: 'user', content: text, locale });
+    renderAssistantMessages();
+    input.value = '';
+    autoGrowAssistantInput();
+
+    try {
+        assistantHistory.push({ role: 'assistant', content: '', locale });
+        renderAssistantMessages();
+
+        const requestHistory = assistantHistory
+            .filter(item => item.role === 'user' || (item.role === 'assistant' && item.content && item.content.trim()))
+            .map(item => ({ role: item.role, content: item.content }));
+
+        const resp = await fetch('/api/portfolio/ai-assistant/chat/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: text,
+                history: requestHistory
+            })
+        });
+
+        if (!resp.ok) {
+            const t = await resp.text();
+            throw new Error(t || 'AI request failed');
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        const assistantMessage = assistantHistory[assistantHistory.length - 1];
+        let streamedText = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            streamedText += decoder.decode(value, { stream: true });
+            const parsed = splitAssistantPayload(streamedText);
+            assistantMessage.content = parsed.text;
+            renderAssistantMessages();
+        }
+
+        streamedText += decoder.decode();
+        const parsed = splitAssistantPayload(streamedText);
+        assistantMessage.content = parsed.text;
+        if (!assistantMessage.content.trim()) {
+            assistantMessage.content = 'The model returned no content this time.';
+        }
+        if (hasRenderableCharts(parsed.charts)) {
+            assistantMessage.charts = parsed.charts;
+        }
+        renderAssistantMessages();
+    } catch (e) {
+        if (assistantHistory.length && assistantHistory[assistantHistory.length - 1].role === 'assistant') {
+            assistantHistory.pop();
+            renderAssistantMessages();
+        }
+        err.textContent = e.message || 'AI assistant is temporarily unavailable. Please try again later.';
+        err.style.display = 'block';
+    } finally {
+        assistantSending = false;
+        sendBtn.disabled = false;
+    }
+}
+
+document.getElementById('assistant-send').addEventListener('click', sendAssistantMessage);
+
+function splitAssistantPayload(rawText) {
+    const marker = '<<AI_CHARTS_JSON>>';
+    const idx = rawText.indexOf(marker);
+    if (idx === -1) {
+        const fallback = tryParseChartsFallback(rawText);
+        return fallback || { text: rawText, charts: null };
+    }
+
+    const text = rawText.slice(0, idx).trim();
+    const jsonText = rawText.slice(idx + marker.length).trim();
+    if (!jsonText) {
+        return { text, charts: null };
+    }
+
+    try {
+        return { text, charts: JSON.parse(jsonText) };
+    } catch {
+        return { text, charts: null };
+    }
+}
+
+function tryParseChartsFallback(rawText) {
+    const braceIndices = [];
+    for (let i = 0; i < rawText.length; i += 1) {
+        if (rawText[i] === '{') {
+            braceIndices.push(i);
+        }
+    }
+
+    for (const idx of braceIndices) {
+        const jsonText = rawText.slice(idx).trim();
+        if (!jsonText.includes('current_portfolio_forecast')
+            && !jsonText.includes('recommended_allocation')
+            && !jsonText.includes('expected_drivers')) {
+            continue;
+        }
+        try {
+            return {
+                text: rawText.slice(0, idx).trim(),
+                charts: JSON.parse(jsonText)
+            };
+        } catch {
+            // Try next candidate opening brace.
+        }
+    }
+
+    return null;
+}
+
+function hasRenderableCharts(charts) {
+    if (!charts) return false;
+
+    const hasLine = charts.current_portfolio_forecast
+        && Array.isArray(charts.current_portfolio_forecast.dates)
+        && Array.isArray(charts.current_portfolio_forecast.values)
+        && charts.current_portfolio_forecast.dates.length > 1
+        && charts.current_portfolio_forecast.values.length > 1;
+
+    const hasPie = charts.recommended_allocation
+        && Array.isArray(charts.recommended_allocation.labels)
+        && Array.isArray(charts.recommended_allocation.values)
+        && charts.recommended_allocation.labels.length > 0
+        && charts.recommended_allocation.values.length > 0;
+
+    const hasBar = charts.expected_drivers
+        && Array.isArray(charts.expected_drivers.labels)
+        && Array.isArray(charts.expected_drivers.values)
+        && charts.expected_drivers.labels.length > 0
+        && charts.expected_drivers.values.length > 0;
+
+    return hasLine || hasPie || hasBar;
+}
+
+function selectAssistantCharts(charts) {
+    if (!hasRenderableCharts(charts)) {
+        return [];
+    }
+
+    const selected = [];
+    const hasLine = charts.current_portfolio_forecast
+        && Array.isArray(charts.current_portfolio_forecast.dates)
+        && Array.isArray(charts.current_portfolio_forecast.values)
+        && charts.current_portfolio_forecast.dates.length > 1
+        && charts.current_portfolio_forecast.values.length > 1;
+    const hasPie = charts.recommended_allocation
+        && Array.isArray(charts.recommended_allocation.labels)
+        && Array.isArray(charts.recommended_allocation.values)
+        && charts.recommended_allocation.labels.length > 0;
+    const hasBar = charts.expected_drivers
+        && Array.isArray(charts.expected_drivers.labels)
+        && Array.isArray(charts.expected_drivers.values)
+        && charts.expected_drivers.labels.length > 0;
+
+    if (hasLine) selected.push('line');
+    if (hasPie) selected.push('pie');
+    if (hasBar) selected.push('bar');
+
+    return selected;
+}
+
+function destroyAssistantCharts() {
+    if (assistantPieChartInstance) assistantPieChartInstance.destroy();
+    if (assistantBarChartInstance) assistantBarChartInstance.destroy();
+    if (assistantLineChartInstance) assistantLineChartInstance.destroy();
+    assistantPieChartInstance = null;
+    assistantBarChartInstance = null;
+    assistantLineChartInstance = null;
+}
+
+function buildAllocationChart(ctx, data) {
+    if (!data || !Array.isArray(data.labels) || !Array.isArray(data.values)) return;
+    return new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                data: data.values,
+                backgroundColor: ['#2563eb', '#16a34a', '#f97316', '#8b5cf6', '#ec4899'],
+                borderColor: '#fff',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 10 } }
+            }
+        }
+    });
+}
+
+function buildDriversChart(ctx, data, locale) {
+    if (!data || !Array.isArray(data.labels) || !Array.isArray(data.values)) return;
+    return new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: data.title || (locale === 'zh' ? '收益驱动因子' : 'Expected Return Drivers'),
+                data: data.values,
+                backgroundColor: data.values.map(v => v >= 0 ? 'rgba(34,197,94,.65)' : 'rgba(239,68,68,.65)'),
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: {
+                    ticks: { callback: value => value + '%' }
+                }
+            }
+        }
+    });
+}
+
+function buildForecastChart(ctx, currentForecast, recommendedForecast, locale) {
+    if (!currentForecast) return;
+    if (!Array.isArray(currentForecast.dates) || !Array.isArray(currentForecast.values)) return;
+
+    const datasets = [
+        {
+            label: currentForecast.title || (locale === 'zh' ? '当前持仓预测盈亏' : 'Current Portfolio Forecast Return'),
+            data: currentForecast.values,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239,68,68,.10)',
+            fill: false,
+            tension: .3,
+            pointRadius: 3
+        }
+    ];
+
+    if (recommendedForecast && Array.isArray(recommendedForecast.values)) {
+        datasets.push({
+            label: recommendedForecast.title || (locale === 'zh' ? '建议调仓后预测盈亏' : 'Recommended Portfolio Forecast Return'),
+            data: recommendedForecast.values,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37,99,235,.10)',
+            fill: false,
+            tension: .3,
+            pointRadius: 3
+        });
+    }
+
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: currentForecast.dates,
+            datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: true, position: 'bottom' } },
+            scales: {
+                y: {
+                    ticks: { callback: value => value + '%' }
+                }
+            }
+        }
+    });
+}
 </script>
 </body>
 </html>

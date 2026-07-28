@@ -4,14 +4,13 @@ import com.portfolio.dto.*;
 import com.portfolio.model.DividendHistory;
 import com.portfolio.model.Holding;
 import com.portfolio.model.Portfolio;
-import com.portfolio.model.PortfolioPerformanceCache;
+import com.portfolio.model.PortfolioSnapshot;
 import com.portfolio.model.Stock;
 import com.portfolio.model.UserDividend;
 import com.portfolio.repository.DividendHistoryRepository;
 import com.portfolio.repository.HoldingRepository;
-import com.portfolio.repository.MarketPriceDailyRepository;
 import com.portfolio.repository.PortfolioRepository;
-import com.portfolio.repository.PortfolioPerformanceCacheRepository;
+import com.portfolio.repository.PortfolioSnapshotRepository;
 import com.portfolio.repository.StockRepository;
 import com.portfolio.repository.TransactionRepository;
 import com.portfolio.repository.UserDividendRepository;
@@ -23,15 +22,11 @@ import com.portfolio.model.Transaction;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class PortfolioServiceImpl implements PortfolioService {
-
-        private static final int PERFORMANCE_WINDOW_DAYS = 7;
-        private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
     private static final Logger log = LoggerFactory.getLogger(PortfolioServiceImpl.class);
 
@@ -44,9 +39,7 @@ public class PortfolioServiceImpl implements PortfolioService {
     private final PortfolioRepository portfolioRepository;
     private final HoldingRepository holdingRepository;
     private final StockRepository stockRepository;
-        private final PortfolioPerformanceCacheRepository performanceCacheRepository;
-        private final TransactionRepository transactionRepository;
-        private final MarketPriceDailyRepository marketPriceDailyRepository;
+    private final PortfolioSnapshotRepository snapshotRepository;
     private final PriceService priceService;
     private final DividendHistoryRepository dividendHistoryRepository;
     private final UserDividendRepository userDividendRepository;
@@ -65,9 +58,7 @@ public class PortfolioServiceImpl implements PortfolioService {
         this.portfolioRepository = portfolioRepository;
         this.holdingRepository = holdingRepository;
         this.stockRepository = stockRepository;
-                this.performanceCacheRepository = performanceCacheRepository;
-                this.transactionRepository = transactionRepository;
-                this.marketPriceDailyRepository = marketPriceDailyRepository;
+        this.snapshotRepository = snapshotRepository;
         this.priceService = priceService;
         this.dividendHistoryRepository = dividendHistoryRepository;
         this.userDividendRepository = userDividendRepository;
@@ -302,38 +293,42 @@ public class PortfolioServiceImpl implements PortfolioService {
     }
 
     @Override
-    @org.springframework.transaction.annotation.Transactional
     public List<WeeklyPerformanceResponse> getWeeklyPerformance(Long portfolioId) {
          List<LocalDate> tradeDates = marketPriceDailyRepository.findLatestTradeDates(PERFORMANCE_WINDOW_DAYS);
                 if (tradeDates.isEmpty()) {
             return List.of();
         }
 
-                List<LocalDate> orderedDates = new ArrayList<>(tradeDates);
-                Collections.reverse(orderedDates);
+        // Reverse to chronological order
+        List<PortfolioSnapshot> ordered = new ArrayList<>(snapshots);
+        Collections.reverse(ordered);
 
-                List<PortfolioPerformanceCache> cached = performanceCacheRepository
-                                .findByPortfolioIdAndPerformanceDates(portfolioId, orderedDates);
-                LocalDateTime latestMarketRefresh = marketPriceDailyRepository.findLatestFetchedAtForTradeDates(orderedDates);
+        BigDecimal initialCost = ordered.getFirst().investedCost();
+        List<WeeklyPerformanceResponse> result = new ArrayList<>();
 
-                boolean cacheComplete = cached.size() == orderedDates.size();
-                boolean cacheFresh = latestMarketRefresh == null
-                                || cached.stream().allMatch(entry -> !entry.refreshedAt().isBefore(latestMarketRefresh));
+        for (int i = 0; i < ordered.size(); i++) {
+            PortfolioSnapshot snap = ordered.get(i);
+            BigDecimal dailyProfit;
+            if (i == 0) {
+                dailyProfit = BigDecimal.ZERO;
+            } else {
+                dailyProfit = snap.totalValue().subtract(ordered.get(i - 1).totalValue());
+            }
+            BigDecimal returnRate = initialCost.compareTo(BigDecimal.ZERO) > 0
+                    ? snap.totalValue().subtract(initialCost)
+                            .multiply(BigDecimal.valueOf(100))
+                            .divide(initialCost, 2, RoundingMode.HALF_UP)
+                    : BigDecimal.ZERO;
 
-                List<PortfolioPerformanceCache> effectiveCache = cached;
-                if (!cacheComplete || !cacheFresh) {
-                        effectiveCache = rebuildPerformanceCache(portfolioId, orderedDates);
-                        performanceCacheRepository.replaceForPortfolio(portfolioId, effectiveCache);
+            result.add(new WeeklyPerformanceResponse(
+                    snap.snapshotDate(),
+                    snap.totalValue(),
+                    dailyProfit.setScale(2, RoundingMode.HALF_UP),
+                    returnRate
+            ));
         }
 
-                return effectiveCache.stream()
-                                .map(entry -> new WeeklyPerformanceResponse(
-                                                entry.performanceDate(),
-                                                entry.totalValue(),
-                                                entry.cumulativeProfit(),
-                                                entry.returnRate()
-                                ))
-                                .toList();
+        return result;
     }
 
         private List<PortfolioPerformanceCache> rebuildPerformanceCache(Long portfolioId, List<LocalDate> orderedDates) {

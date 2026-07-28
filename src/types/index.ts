@@ -40,17 +40,10 @@ export interface PortfolioOverviewResponse {
 }
 
 export interface WeeklyPerformanceResponse {
-  date: string;
-  totalValue: number;
-  dailyProfit: number;
-  returnRate: number;
-}
-
-export interface PriceHistoryResponse {
-  stockId: number;
-  symbol: string;
   dates: string[];
-  prices: number[];
+  dailyProfits: number[];
+  dailyReturns: number[];
+  cumulativeReturn: number;
 }
 
 export interface TransactionRequest {
@@ -69,4 +62,18 @@ export interface TransactionResponse {
   totalAmount: number;
   newCashBalance: number;
   message: string;
+}
+
+export interface AiChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface AiChatRequest {
+  message: string;
+  history?: AiChatMessage[];
+}
+
+export interface AiChatResponse {
+  reply: string;
 }
