@@ -56,8 +56,7 @@ public class PortfolioServiceImpl implements PortfolioService {
 
     @Override
     public PortfolioOverviewResponse getPortfolioOverview(Long portfolioId) {
-        Portfolio portfolio = portfolioRepository.findById(portfolioId)
-                .orElseThrow(() -> new IllegalArgumentException("Portfolio not found: " + portfolioId));
+       
 
         List<Holding> holdings = holdingRepository.findByPortfolioId(portfolioId);
         LocalDate today = LocalDate.now();
@@ -65,8 +64,9 @@ public class PortfolioServiceImpl implements PortfolioService {
         // ======== 1. 处理分红：计算 + 派息日到账 ========
         processDividends(portfolioId, today);
 
-        // 重新读取 portfolio（可能已被 processDividends 更新现金余额）
-        portfolio = portfolioRepository.findById(portfolioId).orElseThrow();
+        // 读取 portfolio
+         Portfolio portfolio = portfolioRepository.findById(portfolioId)
+                .orElseThrow(() -> new IllegalArgumentException("Portfolio not found: " + portfolioId));
 
         // ======== 2. 计算持仓市值 ========
         BigDecimal holdingsValue = BigDecimal.ZERO;

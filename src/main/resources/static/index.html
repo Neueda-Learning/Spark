@@ -664,7 +664,7 @@ function renderHoldings() {
         html += '<td>' + fmt(h.currentPrice) + '</td>';
         html += '<td class="' + cls + '">' + fmt(h.profit) + '</td>';
         html += '<td class="' + cls + '">' + fmtPct(h.profitPercent) + '</td>';
-        html += '<td style="color:#10b981">$' + (h.annualDividend || 0).toFixed(2) + '</td>';
+        html += '<td style="color:#10b981">$' + (h.cumulativeDividend || 0).toFixed(2) + '</td>';
         html += '<td><div class="btn-group">';
         html += '<button class="btn btn-buy btn-sm" onclick="openTrade(\'' + h.symbol + '\',' + h.stockId + ',\'BUY\')">买入</button>';
         html += '<button class="btn btn-sell btn-sm" onclick="openTrade(\'' + h.symbol + '\',' + h.stockId + ',\'SELL\')">卖出</button>';
