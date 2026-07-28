@@ -7,6 +7,8 @@ import {
   HoldingResponse,
   TransactionRequest,
   TransactionResponse,
+  AiChatRequest,
+  AiChatResponse,
 } from '../types';
 
 const api = axios.create({
@@ -37,6 +39,11 @@ export const transactionApi = {
     api
       .post<TransactionResponse>('/portfolio/transactions', req)
       .then((r) => r.data),
+};
+
+export const assistantApi = {
+  chat: (req: AiChatRequest) =>
+    api.post<AiChatResponse>('/portfolio/ai-assistant/chat', req).then((r) => r.data),
 };
 
 export default api;

@@ -9,7 +9,10 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: #f5f5f5;
+            background:
+                radial-gradient(circle at top left, rgba(59,130,246,.12), transparent 34%),
+                radial-gradient(circle at top right, rgba(34,197,94,.10), transparent 28%),
+                linear-gradient(180deg, #f8fbff 0%, #eef4fb 100%);
             color: #333;
             min-height: 100vh;
         }
@@ -51,12 +54,156 @@
 
         /* ===== Container ===== */
         .container {
-            max-width: 1200px;
+            max-width: 1280px;
             margin: 24px auto;
             padding: 0 20px;
         }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+
+        /* ===== Assistant Chat ===== */
+        .assistant-shell {
+            background: rgba(255,255,255,.92);
+            border: 1px solid rgba(148,163,184,.22);
+            border-radius: 20px;
+            box-shadow: 0 18px 50px rgba(15,23,42,.10);
+            padding: 22px;
+            height: calc(100vh - 118px);
+            min-height: 640px;
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+        }
+        .assistant-head h3 {
+            color: #1e293b;
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+        .assistant-head p {
+            color: #64748b;
+            font-size: 12px;
+            margin-bottom: 12px;
+        }
+        .assistant-messages {
+            flex: 1;
+            overflow-y: auto;
+            border: 1px solid #dbe4f0;
+            background: linear-gradient(180deg, #fbfdff 0%, #f5f8fc 100%);
+            border-radius: 16px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-height: 0;
+        }
+        .assistant-msg {
+            max-width: min(92%, 820px);
+            padding: 12px 14px;
+            border-radius: 14px;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .assistant-msg.user {
+            margin-left: auto;
+            background: #2563eb;
+            color: #fff;
+        }
+        .assistant-msg.assistant {
+            margin-right: auto;
+            background: #fff;
+            color: #1f2937;
+            border: 1px solid #e2e8f0;
+        }
+        .assistant-input-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+            position: sticky;
+            bottom: 0;
+            padding: 12px 0 2px;
+            align-items: flex-end;
+            background: linear-gradient(180deg, rgba(255,255,255,0), rgba(255,255,255,.96) 28%, rgba(255,255,255,.99));
+        }
+        .assistant-input-row textarea {
+            flex: 1;
+            border: 1px solid #cbd5e1;
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-size: 14px;
+            outline: none;
+            resize: none;
+            min-height: 48px;
+            max-height: 180px;
+            line-height: 1.5;
+            overflow-y: auto;
+            box-shadow: 0 8px 24px rgba(15,23,42,.05);
+        }
+        .assistant-input-row textarea:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+        }
+        .assistant-send {
+            border: none;
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #fff;
+            border-radius: 14px;
+            padding: 12px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            min-width: 88px;
+            box-shadow: 0 10px 20px rgba(37,99,235,.18);
+        }
+        .assistant-send:disabled {
+            opacity: .5;
+            cursor: not-allowed;
+        }
+        .assistant-error {
+            color: #dc2626;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        .assistant-insights {
+            display: none;
+        }
+        .assistant-chart-card {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            background: #fff;
+            padding: 14px;
+            min-height: 280px;
+        }
+        .assistant-msg-charts {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .assistant-msg-chart-card {
+            background: #f8fafc;
+            border: 1px solid #dbe4f0;
+            border-radius: 10px;
+            padding: 12px;
+        }
+        .assistant-msg-chart-card h5 {
+            font-size: 13px;
+            color: #1e293b;
+            margin-bottom: 8px;
+        }
+        .assistant-msg-chart-wrap {
+            position: relative;
+            height: 170px;
+        }
+        .assistant-chart-card h4 {
+            color: #1e293b;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .assistant-chart-wrap {
+            position: relative;
+            height: 220px;
+        }
 
         /* ===== Cards ===== */
         .card {
@@ -268,9 +415,22 @@
         @media (max-width: 768px) {
             .stat-row { grid-template-columns: 1fr; }
             .chart-row { grid-template-columns: 1fr; }
+            .assistant-msg-charts { grid-template-columns: 1fr; }
             .stat-card .value { font-size: 24px; }
             table { font-size: 12px; }
             thead th, tbody td { padding: 8px 6px; }
+            .assistant-shell {
+                padding: 16px;
+                border-radius: 16px;
+                height: calc(100vh - 100px);
+                min-height: 560px;
+            }
+            .assistant-head h3 { font-size: 20px; }
+            .assistant-input-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .assistant-send { width: 100%; }
         }
     </style>
 </head>
@@ -281,6 +441,7 @@
     <div class="brand">Portfolio Manager</div>
     <button class="tab-btn active" data-tab="overview">组合总览</button>
     <button class="tab-btn" data-tab="operations">投资操作</button>
+    <button class="tab-btn" data-tab="assistant">投资助手</button>
 </nav>
 
 <div class="container">
@@ -334,6 +495,39 @@
             <div class="card-title">市场标的</div>
             <div id="stocks-content">
                 <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab 3: 投资助手 -->
+    <div id="tab-assistant" class="tab-content">
+        <div class="assistant-shell">
+            <div class="assistant-head">
+                <h3>投资助手</h3>
+                <p>投资助手</p>
+            </div>
+
+            <div id="assistant-messages" class="assistant-messages"></div>
+
+            <div class="assistant-input-row">
+                <textarea id="assistant-input" rows="1" placeholder="例如：请结合我当前持仓给出调仓建议"></textarea>
+                <button id="assistant-send" class="assistant-send">发送</button>
+            </div>
+            <div id="assistant-error" class="assistant-error" style="display:none"></div>
+
+            <div class="assistant-insights">
+                <div class="assistant-chart-card">
+                    <h4>当前资产分配</h4>
+                    <div class="assistant-chart-wrap"><canvas id="assistantPieChart"></canvas></div>
+                </div>
+                <div class="assistant-chart-card">
+                    <h4>持仓盈亏率</h4>
+                    <div class="assistant-chart-wrap"><canvas id="assistantBarChart"></canvas></div>
+                </div>
+                <div class="assistant-chart-card">
+                    <h4>7天组合表现</h4>
+                    <div class="assistant-chart-wrap"><canvas id="assistantLineChart"></canvas></div>
+                </div>
             </div>
         </div>
     </div>
@@ -391,6 +585,19 @@ const dataLoaded = { overview: false, operations: false };
 let pieChartInstance = null;
 let barLineChartInstance = null;
 let hoverChartInstance = null;
+let assistantPieChartInstance = null;
+let assistantBarChartInstance = null;
+let assistantLineChartInstance = null;
+
+// ---------- Assistant state ----------
+let assistantSending = false;
+let assistantInputAutoGrowBound = false;
+const assistantHistory = [
+    {
+        role: 'assistant',
+        content: '你好，我是你的投资助手。你可以直接问我：当前持仓风险、调仓建议、建仓方向等。'
+    }
+];
 
 // ---------- Helpers ----------
 function fmt(n) {
@@ -400,6 +607,14 @@ function fmtPct(n) {
     return (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%';
 }
 function pnlClass(n) { return n >= 0 ? 'positive' : 'negative'; }
+
+function autoGrowAssistantInput() {
+    const input = document.getElementById('assistant-input');
+    if (!input) return;
+    input.style.height = 'auto';
+    const maxHeight = 180;
+    input.style.height = Math.min(input.scrollHeight, maxHeight) + 'px';
+}
 
 // ---------- Tab switching ----------
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -411,6 +626,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.getElementById('tab-' + tab).classList.add('active');
         if (tab === 'overview' && !dataLoaded.overview) loadOverview();
         if (tab === 'operations' && !dataLoaded.operations) loadOperations();
+        if (tab === 'assistant') initAssistantTab();
     });
 });
 
@@ -810,6 +1026,394 @@ document.getElementById('modal-confirm').addEventListener('click', async () => {
    Init
    ================================================================ */
 loadOverview();
+
+/* ================================================================
+   Tab 3 – 投资助手
+   ================================================================ */
+function initAssistantTab() {
+    renderAssistantMessages();
+    if (!assistantInputAutoGrowBound) {
+        const input = document.getElementById('assistant-input');
+        if (input) {
+            input.addEventListener('input', autoGrowAssistantInput);
+            input.addEventListener('keydown', handleAssistantInputKeydown);
+            assistantInputAutoGrowBound = true;
+        }
+    }
+    autoGrowAssistantInput();
+}
+
+function handleAssistantInputKeydown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendAssistantMessage();
+    }
+}
+
+function renderAssistantMessages() {
+    const box = document.getElementById('assistant-messages');
+    destroyAssistantCharts();
+    box.innerHTML = assistantHistory
+        .map((m, index) => {
+            let html = '<div class="assistant-msg ' + m.role + '">';
+            html += escapeHtml(m.content || '');
+            if (m.role === 'assistant' && hasRenderableCharts(m.charts)) {
+                html += renderAssistantMessageChartsMarkup(index, m.charts);
+            }
+            html += '</div>';
+            return html;
+        })
+        .join('');
+    renderAssistantMessageCharts();
+    box.scrollTop = box.scrollHeight;
+}
+
+function renderAssistantMessageChartsMarkup(index, charts) {
+    const selectedCharts = selectAssistantCharts(charts);
+    if (!selectedCharts.length) {
+        return '';
+    }
+
+    const allocationTitle = escapeHtml((charts.recommended_allocation && charts.recommended_allocation.title) || '建议持仓占比');
+    const driversTitle = escapeHtml((charts.expected_drivers && charts.expected_drivers.title) || '收益驱动因子');
+    const forecastTitle = escapeHtml('AI 预测盈亏走势');
+    const showLine = selectedCharts.includes('line');
+    const showPie = selectedCharts.includes('pie');
+    const showBar = selectedCharts.includes('bar');
+
+    return `
+        <div class="assistant-msg-charts">
+            ${showLine ? `<div class="assistant-msg-chart-card" style="${(showPie || showBar) ? 'grid-column: 1 / -1;' : ''}">
+                <h5>${forecastTitle}</h5>
+                <div class="assistant-msg-chart-wrap"><canvas id="assistant-msg-line-${index}"></canvas></div>
+            </div>` : ''}
+            ${showPie ? `<div class="assistant-msg-chart-card">
+                <h5>${allocationTitle}</h5>
+                <div class="assistant-msg-chart-wrap"><canvas id="assistant-msg-pie-${index}"></canvas></div>
+            </div>` : ''}
+            ${showBar ? `<div class="assistant-msg-chart-card" style="${showPie ? '' : 'grid-column: 1 / -1;'}">
+                <h5>${driversTitle}</h5>
+                <div class="assistant-msg-chart-wrap"><canvas id="assistant-msg-bar-${index}"></canvas></div>
+            </div>` : ''}
+        </div>
+    `;
+}
+
+function renderAssistantMessageCharts() {
+    assistantHistory.forEach((message, index) => {
+        if (!message.charts) return;
+
+        const pieCanvas = document.getElementById(`assistant-msg-pie-${index}`);
+        const barCanvas = document.getElementById(`assistant-msg-bar-${index}`);
+        const lineCanvas = document.getElementById(`assistant-msg-line-${index}`);
+
+        if (pieCanvas) {
+            assistantPieChartInstance = buildAllocationChart(pieCanvas.getContext('2d'), message.charts.recommended_allocation);
+        }
+        if (barCanvas) {
+            assistantBarChartInstance = buildDriversChart(barCanvas.getContext('2d'), message.charts.expected_drivers);
+        }
+        if (lineCanvas) {
+            assistantLineChartInstance = buildForecastChart(
+                lineCanvas.getContext('2d'),
+                message.charts.current_portfolio_forecast,
+                message.charts.recommended_portfolio_forecast
+            );
+        }
+    });
+}
+
+function escapeHtml(text) {
+    return String(text)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+}
+
+async function sendAssistantMessage() {
+    const input = document.getElementById('assistant-input');
+    const sendBtn = document.getElementById('assistant-send');
+    const err = document.getElementById('assistant-error');
+
+    const text = (input.value || '').trim();
+    if (!text || assistantSending) return;
+
+    assistantSending = true;
+    sendBtn.disabled = true;
+    err.style.display = 'none';
+
+    assistantHistory.push({ role: 'user', content: text });
+    renderAssistantMessages();
+    input.value = '';
+    autoGrowAssistantInput();
+
+    try {
+        assistantHistory.push({ role: 'assistant', content: '' });
+        renderAssistantMessages();
+
+        const requestHistory = assistantHistory
+            .filter(item => item.role === 'user' || (item.role === 'assistant' && item.content && item.content.trim()))
+            .map(item => ({ role: item.role, content: item.content }));
+
+        const resp = await fetch('/api/portfolio/ai-assistant/chat/stream', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: text,
+                history: requestHistory
+            })
+        });
+
+        if (!resp.ok) {
+            const t = await resp.text();
+            throw new Error(t || 'AI接口调用失败');
+        }
+
+        const reader = resp.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        const assistantMessage = assistantHistory[assistantHistory.length - 1];
+        let streamedText = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            streamedText += decoder.decode(value, { stream: true });
+            const parsed = splitAssistantPayload(streamedText);
+            assistantMessage.content = parsed.text;
+            renderAssistantMessages();
+        }
+
+        streamedText += decoder.decode();
+        const parsed = splitAssistantPayload(streamedText);
+        assistantMessage.content = parsed.text;
+        if (!assistantMessage.content.trim()) {
+            assistantMessage.content = '模型本次没有返回内容。';
+        }
+        if (hasRenderableCharts(parsed.charts)) {
+            assistantMessage.charts = parsed.charts;
+        }
+        renderAssistantMessages();
+    } catch (e) {
+        if (assistantHistory.length && assistantHistory[assistantHistory.length - 1].role === 'assistant') {
+            assistantHistory.pop();
+            renderAssistantMessages();
+        }
+        err.textContent = e.message || 'AI 助手暂时不可用，请稍后重试';
+        err.style.display = 'block';
+    } finally {
+        assistantSending = false;
+        sendBtn.disabled = false;
+    }
+}
+
+document.getElementById('assistant-send').addEventListener('click', sendAssistantMessage);
+
+function splitAssistantPayload(rawText) {
+    const marker = '<<AI_CHARTS_JSON>>';
+    const idx = rawText.indexOf(marker);
+    if (idx === -1) {
+        const fallback = tryParseChartsFallback(rawText);
+        return fallback || { text: rawText, charts: null };
+    }
+
+    const text = rawText.slice(0, idx).trim();
+    const jsonText = rawText.slice(idx + marker.length).trim();
+    if (!jsonText) {
+        return { text, charts: null };
+    }
+
+    try {
+        return { text, charts: JSON.parse(jsonText) };
+    } catch {
+        return { text, charts: null };
+    }
+}
+
+function tryParseChartsFallback(rawText) {
+    const braceIndices = [];
+    for (let i = 0; i < rawText.length; i += 1) {
+        if (rawText[i] === '{') {
+            braceIndices.push(i);
+        }
+    }
+
+    for (const idx of braceIndices) {
+        const jsonText = rawText.slice(idx).trim();
+        if (!jsonText.includes('current_portfolio_forecast')
+            && !jsonText.includes('recommended_allocation')
+            && !jsonText.includes('expected_drivers')) {
+            continue;
+        }
+        try {
+            return {
+                text: rawText.slice(0, idx).trim(),
+                charts: JSON.parse(jsonText)
+            };
+        } catch {
+            // Try next candidate opening brace.
+        }
+    }
+
+    return null;
+}
+
+function hasRenderableCharts(charts) {
+    if (!charts) return false;
+
+    const hasLine = charts.current_portfolio_forecast
+        && Array.isArray(charts.current_portfolio_forecast.dates)
+        && Array.isArray(charts.current_portfolio_forecast.values)
+        && charts.current_portfolio_forecast.dates.length > 1
+        && charts.current_portfolio_forecast.values.length > 1;
+
+    const hasPie = charts.recommended_allocation
+        && Array.isArray(charts.recommended_allocation.labels)
+        && Array.isArray(charts.recommended_allocation.values)
+        && charts.recommended_allocation.labels.length > 0
+        && charts.recommended_allocation.values.length > 0;
+
+    const hasBar = charts.expected_drivers
+        && Array.isArray(charts.expected_drivers.labels)
+        && Array.isArray(charts.expected_drivers.values)
+        && charts.expected_drivers.labels.length > 0
+        && charts.expected_drivers.values.length > 0;
+
+    return hasLine || hasPie || hasBar;
+}
+
+function selectAssistantCharts(charts) {
+    if (!hasRenderableCharts(charts)) {
+        return [];
+    }
+
+    const selected = [];
+    const hasLine = charts.current_portfolio_forecast
+        && Array.isArray(charts.current_portfolio_forecast.dates)
+        && Array.isArray(charts.current_portfolio_forecast.values)
+        && charts.current_portfolio_forecast.dates.length > 1
+        && charts.current_portfolio_forecast.values.length > 1;
+    const hasPie = charts.recommended_allocation
+        && Array.isArray(charts.recommended_allocation.labels)
+        && Array.isArray(charts.recommended_allocation.values)
+        && charts.recommended_allocation.labels.length > 0;
+    const hasBar = charts.expected_drivers
+        && Array.isArray(charts.expected_drivers.labels)
+        && Array.isArray(charts.expected_drivers.values)
+        && charts.expected_drivers.labels.length > 0;
+
+    if (hasLine) selected.push('line');
+    if (hasPie) selected.push('pie');
+    if (hasBar) selected.push('bar');
+
+    return selected;
+}
+
+function destroyAssistantCharts() {
+    if (assistantPieChartInstance) assistantPieChartInstance.destroy();
+    if (assistantBarChartInstance) assistantBarChartInstance.destroy();
+    if (assistantLineChartInstance) assistantLineChartInstance.destroy();
+    assistantPieChartInstance = null;
+    assistantBarChartInstance = null;
+    assistantLineChartInstance = null;
+}
+
+function buildAllocationChart(ctx, data) {
+    if (!data || !Array.isArray(data.labels) || !Array.isArray(data.values)) return;
+    return new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                data: data.values,
+                backgroundColor: ['#2563eb', '#16a34a', '#f97316', '#8b5cf6', '#ec4899'],
+                borderColor: '#fff',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { boxWidth: 10 } }
+            }
+        }
+    });
+}
+
+function buildDriversChart(ctx, data) {
+    if (!data || !Array.isArray(data.labels) || !Array.isArray(data.values)) return;
+    return new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: data.title || '收益驱动因子',
+                data: data.values,
+                backgroundColor: data.values.map(v => v >= 0 ? 'rgba(34,197,94,.65)' : 'rgba(239,68,68,.65)'),
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: {
+                    ticks: { callback: value => value + '%' }
+                }
+            }
+        }
+    });
+}
+
+function buildForecastChart(ctx, currentForecast, recommendedForecast) {
+    if (!currentForecast) return;
+    if (!Array.isArray(currentForecast.dates) || !Array.isArray(currentForecast.values)) return;
+
+    const datasets = [
+        {
+            label: currentForecast.title || '当前持仓预测盈亏',
+            data: currentForecast.values,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239,68,68,.10)',
+            fill: false,
+            tension: .3,
+            pointRadius: 3
+        }
+    ];
+
+    if (recommendedForecast && Array.isArray(recommendedForecast.values)) {
+        datasets.push({
+            label: recommendedForecast.title || '建议调仓后预测盈亏',
+            data: recommendedForecast.values,
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37,99,235,.10)',
+            fill: false,
+            tension: .3,
+            pointRadius: 3
+        });
+    }
+
+    return new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: currentForecast.dates,
+            datasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: true, position: 'bottom' } },
+            scales: {
+                y: {
+                    ticks: { callback: value => value + '%' }
+                }
+            }
+        }
+    });
+}
 </script>
 </body>
 </html>
