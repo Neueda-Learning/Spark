@@ -1,5 +1,4 @@
--- Portfolio Manager Database Schema
-
+-- Investment items (stocks, bonds, cash equivalents)
 CREATE TABLE IF NOT EXISTS stock (
     id              BIGINT         AUTO_INCREMENT PRIMARY KEY,
     symbol          VARCHAR(10)    NOT NULL UNIQUE,
@@ -7,9 +6,7 @@ CREATE TABLE IF NOT EXISTS stock (
     asset_type      VARCHAR(20)    NOT NULL,
     sector          VARCHAR(50),
     exchange        VARCHAR(20)    NOT NULL,
-    currency        VARCHAR(3)     NOT NULL DEFAULT 'USD',
-    dividend_yield  DECIMAL(6,4)   NOT NULL DEFAULT 0.0000,
-    dividend_date   DATE
+    currency        VARCHAR(3)     NOT NULL DEFAULT 'USD'
 );
 
 CREATE TABLE IF NOT EXISTS portfolio (
@@ -53,4 +50,34 @@ CREATE TABLE IF NOT EXISTS portfolio_snapshot (
     invested_cost  DECIMAL(18,2)  NOT NULL,
     CONSTRAINT fk_snap_portfolio FOREIGN KEY (portfolio_id) REFERENCES portfolio(id),
     CONSTRAINT uq_portfolio_date UNIQUE (portfolio_id, snapshot_date)
+);
+
+-- Dividend history announced by companies
+CREATE TABLE IF NOT EXISTS dividend_history (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    symbol VARCHAR(20) NOT NULL,
+    ex_date DATE NOT NULL,                 -- 除息日：判断是否持有的截止日
+    pay_date DATE NOT NULL,                -- 派息日：分红到账日
+    dividend_per_share DECIMAL(10,4) NOT NULL, -- 每股税前分红金额
+    frequency VARCHAR(20) DEFAULT 'quarterly', -- quarterly / semi-annual / annual
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_symbol_ex_date (symbol, ex_date)
+);
+
+-- User dividend records (calculated from holdings + dividend_history)
+CREATE TABLE IF NOT EXISTS user_dividend (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    portfolio_id BIGINT NOT NULL,
+    symbol VARCHAR(20) NOT NULL,
+    ex_date DATE NOT NULL,
+    pay_date DATE NOT NULL,
+    shares_held INT NOT NULL,
+    dividend_per_share DECIMAL(10,4) NOT NULL,
+    gross_amount DECIMAL(12,2) NOT NULL,
+    tax_rate DECIMAL(6,4) NOT NULL DEFAULT 0.0000,
+    net_amount DECIMAL(12,2) NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',  -- pending / paid
+    paid_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_portfolio_symbol_ex (portfolio_id, symbol, ex_date)
 );
