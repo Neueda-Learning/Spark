@@ -78,7 +78,7 @@ export interface AiChatMessage {
 
 export interface AiChatRequest {
   message: string;
-  history: AiChatMessage[];
+  history?: AiChatMessage[];
 }
 
 export interface AiChatResponse {
