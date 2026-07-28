@@ -40,7 +40,8 @@ public class StockServiceImpl implements StockService {
                         s.sector(),
                         s.exchange(),
                         priceService.getCurrentPrice(s.symbol()),
-                        priceService.getChangePercent(s.symbol())
+                        priceService.getChangePercent(s.symbol()),
+                        s.dividendYield()
                 ))
                 .toList();
     }
