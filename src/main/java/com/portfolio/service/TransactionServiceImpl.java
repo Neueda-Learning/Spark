@@ -7,7 +7,6 @@ import com.portfolio.model.Portfolio;
 import com.portfolio.model.Stock;
 import com.portfolio.model.Transaction;
 import com.portfolio.repository.HoldingRepository;
-import com.portfolio.repository.PortfolioPerformanceCacheRepository;
 import com.portfolio.repository.PortfolioRepository;
 import com.portfolio.repository.StockRepository;
 import com.portfolio.repository.TransactionRepository;
@@ -30,20 +29,17 @@ public class TransactionServiceImpl implements TransactionService {
     private final PortfolioRepository portfolioRepository;
     private final HoldingRepository holdingRepository;
     private final TransactionRepository transactionRepository;
-    private final PortfolioPerformanceCacheRepository performanceCacheRepository;
     private final PriceService priceService;
 
     public TransactionServiceImpl(StockRepository stockRepository,
                                   PortfolioRepository portfolioRepository,
                                   HoldingRepository holdingRepository,
                                   TransactionRepository transactionRepository,
-                                  PortfolioPerformanceCacheRepository performanceCacheRepository,
                                   PriceService priceService) {
         this.stockRepository = stockRepository;
         this.portfolioRepository = portfolioRepository;
         this.holdingRepository = holdingRepository;
         this.transactionRepository = transactionRepository;
-        this.performanceCacheRepository = performanceCacheRepository;
         this.priceService = priceService;
     }
 
@@ -102,7 +98,6 @@ public class TransactionServiceImpl implements TransactionService {
         Transaction tx = new Transaction(null, portfolio.id(), stock.id(), "BUY",
                 quantity, price, totalAmount, LocalDateTime.now());
         Transaction savedTx = transactionRepository.save(tx);
-        performanceCacheRepository.deleteByPortfolioId(portfolio.id());
 
         log.info("BUY: {} x {} of {} @ {}, remaining cash: {}", quantity, stock.symbol(), stock.name(), price, newCash);
 
@@ -144,7 +139,6 @@ public class TransactionServiceImpl implements TransactionService {
         Transaction tx = new Transaction(null, portfolio.id(), stock.id(), "SELL",
                 quantity, price, totalAmount, LocalDateTime.now());
         Transaction savedTx = transactionRepository.save(tx);
-        performanceCacheRepository.deleteByPortfolioId(portfolio.id());
 
         log.info("SELL: {} x {} of {} @ {}, remaining cash: {}", quantity, stock.symbol(), stock.name(), price, newCash);
 

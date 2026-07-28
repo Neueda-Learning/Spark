@@ -40,10 +40,10 @@ export interface PortfolioOverviewResponse {
 }
 
 export interface WeeklyPerformanceResponse {
-  date: string;
-  totalValue: number;
-  dailyProfit: number;
-  returnRate: number;
+  dates: string[];
+  dailyProfits: number[];
+  dailyReturns: number[];
+  cumulativeReturn: number;
 }
 
 export interface TransactionRequest {
