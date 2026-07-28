@@ -42,7 +42,6 @@ CREATE TABLE IF NOT EXISTS transaction (
     CONSTRAINT chk_type CHECK (type IN ('BUY','SELL'))
 );
 
-DROP TABLE IF EXISTS portfolio_snapshot;
 
 CREATE TABLE IF NOT EXISTS portfolio_performance_cache (
     id                 BIGINT         AUTO_INCREMENT PRIMARY KEY,
