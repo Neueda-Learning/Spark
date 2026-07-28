@@ -1,16 +1,8 @@
 package com.portfolio.service;
 
 import com.portfolio.dto.*;
-import com.portfolio.model.Holding;
-import com.portfolio.model.Portfolio;
-import com.portfolio.model.PortfolioSnapshot;
-import com.portfolio.model.Stock;
-import com.portfolio.model.Transaction;
-import com.portfolio.repository.HoldingRepository;
-import com.portfolio.repository.PortfolioRepository;
-import com.portfolio.repository.PortfolioSnapshotRepository;
-import com.portfolio.repository.StockRepository;
-import com.portfolio.repository.TransactionRepository;
+import com.portfolio.model.*;
+import com.portfolio.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -38,19 +30,28 @@ public class PortfolioServiceImpl implements PortfolioService {
     private final PortfolioSnapshotRepository snapshotRepository;
     private final TransactionRepository transactionRepository;
     private final PriceService priceService;
+    private final DividendHistoryRepository dividendHistoryRepository;
+    private final UserDividendRepository userDividendRepository;
+    private final DividendService dividendService;
 
     public PortfolioServiceImpl(PortfolioRepository portfolioRepository,
                                 HoldingRepository holdingRepository,
                                 StockRepository stockRepository,
                                 PortfolioSnapshotRepository snapshotRepository,
                                 TransactionRepository transactionRepository,
-                                PriceService priceService) {
+                                PriceService priceService,
+                                DividendHistoryRepository dividendHistoryRepository,
+                                UserDividendRepository userDividendRepository,
+                                DividendService dividendService) {
         this.portfolioRepository = portfolioRepository;
         this.holdingRepository = holdingRepository;
         this.stockRepository = stockRepository;
         this.snapshotRepository = snapshotRepository;
         this.transactionRepository = transactionRepository;
         this.priceService = priceService;
+        this.dividendHistoryRepository = dividendHistoryRepository;
+        this.userDividendRepository = userDividendRepository;
+        this.dividendService = dividendService;
     }
 
     @Override
@@ -59,11 +60,17 @@ public class PortfolioServiceImpl implements PortfolioService {
                 .orElseThrow(() -> new IllegalArgumentException("Portfolio not found: " + portfolioId));
 
         List<Holding> holdings = holdingRepository.findByPortfolioId(portfolioId);
+        LocalDate today = LocalDate.now();
 
-        // Calculate total holdings value and group by asset type
+        // ======== 1. 处理分红：计算 + 派息日到账 ========
+        processDividends(portfolioId, today);
+
+        // 重新读取 portfolio（可能已被 processDividends 更新现金余额）
+        portfolio = portfolioRepository.findById(portfolioId).orElseThrow();
+
+        // ======== 2. 计算持仓市值 ========
         BigDecimal holdingsValue = BigDecimal.ZERO;
         BigDecimal totalCost = BigDecimal.ZERO;
-        BigDecimal totalAnnualDividend = BigDecimal.ZERO;
         Map<String, BigDecimal> allocationByType = new LinkedHashMap<>();
 
         for (Holding holding : holdings) {
@@ -77,39 +84,25 @@ public class PortfolioServiceImpl implements PortfolioService {
             holdingsValue = holdingsValue.add(marketValue);
             totalCost = totalCost.add(cost);
 
-            // 计算年化分红：需要考虑除息日是否在持仓期间
-            BigDecimal annualDividend = calculateAnnualDividendWithDividendDate(
-                    portfolioId, stock, holding.quantity(), currentPrice);
-            totalAnnualDividend = totalAnnualDividend.add(annualDividend);
-
             allocationByType.merge(stock.assetType(), marketValue, BigDecimal::add);
         }
 
-        // 加上已清仓股票的分红（除息日持有但后来卖掉的）
-        totalAnnualDividend = totalAnnualDividend.add(
-                calculateDividendsForClosedPositions(portfolioId, holdings));
-
         BigDecimal totalValue = holdingsValue.add(portfolio.cashBalance());
-        // Total money invested in stocks = totalCost
-        // Current value of stocks = holdingsValue
-        // Stock profit = holdingsValue - totalCost
-        // Total portfolio value = holdingsValue + cashBalance
-        // So returnRate = (totalValue - initialCash) / initialCash
-        // But we don't have initialCash stored. Let's use:
-        // totalCost = what was spent buying stocks
-        // cashBalance = what's left
-        // initialCash = totalCost + cashBalance (if no sells) — but sells add cash back
-        // Simpler approach: totalProfit = holdingsValue - totalCost (profit from stocks only)
-        // returnRate = totalProfit / totalCost (return on invested money)
-
-        // Actually the cleanest way:
-        // totalProfit = totalValue - totalCost - cashBalance = holdingsValue - totalCost
         BigDecimal stockProfit = holdingsValue.subtract(totalCost);
         BigDecimal returnRate = totalCost.compareTo(BigDecimal.ZERO) > 0
                 ? stockProfit.multiply(BigDecimal.valueOf(100)).divide(totalCost, 2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
-        // Build allocation
+        // ======== 3. 统计分红 ========
+        // 已到账分红：所有 status = 'paid' 的 net_amount 总和
+        BigDecimal totalDividendPaid = userDividendRepository
+                .sumPaidByPortfolioIdAndDateRange(portfolioId, LocalDate.of(2025, 1, 1), today);
+
+        // 待到账分红：所有 status = 'pending' 的 net_amount 总和
+        BigDecimal totalDividendPending = userDividendRepository
+                .sumPendingByPortfolioId(portfolioId);
+
+        // ======== 4. 资产配置 ========
         List<PortfolioOverviewResponse.AssetAllocation> allocation = new ArrayList<>();
         for (Map.Entry<String, BigDecimal> entry : allocationByType.entrySet()) {
             BigDecimal percentage = totalValue.compareTo(BigDecimal.ZERO) > 0
@@ -122,7 +115,6 @@ public class PortfolioServiceImpl implements PortfolioService {
                     percentage
             ));
         }
-        // Add cash to allocation
         BigDecimal cashPercentage = totalValue.compareTo(BigDecimal.ZERO) > 0
                 ? portfolio.cashBalance().multiply(BigDecimal.valueOf(100)).divide(totalValue, 2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
@@ -138,9 +130,106 @@ public class PortfolioServiceImpl implements PortfolioService {
                 stockProfit.setScale(2, RoundingMode.HALF_UP),
                 returnRate,
                 portfolio.cashBalance().setScale(2, RoundingMode.HALF_UP),
-                totalAnnualDividend.setScale(2, RoundingMode.HALF_UP),
+                totalDividendPaid.setScale(2, RoundingMode.HALF_UP),
+                totalDividendPending.setScale(2, RoundingMode.HALF_UP),
                 allocation
         );
+    }
+
+    /**
+     * 处理分红：
+     * 1. 遍历所有 dividend_history 记录（ex_date <= today）
+     * 2. 对每条记录，计算 ex_date 前一天的持仓数量
+     * 3. 如果持仓 > 0，创建 user_dividend 记录（如不存在）
+     * 4. 如果 pay_date <= today 且 status = 'pending'，将分红加到现金余额，标记为 paid
+     */
+    private void processDividends(Long portfolioId, LocalDate today) {
+        List<DividendHistory> allDividends = dividendHistoryRepository.findUpToDate(today);
+
+        for (DividendHistory dh : allDividends) {
+            // 查找 stock id
+            Optional<Stock> stockOpt = stockRepository.findBySymbol(dh.symbol());
+            if (stockOpt.isEmpty()) continue;
+            Stock stock = stockOpt.get();
+
+            // 检查是否已有该分红记录
+            Optional<UserDividend> existing = userDividendRepository
+                    .findByPortfolioIdAndSymbolAndExDate(portfolioId, dh.symbol(), dh.exDate());
+            if (existing.isPresent()) continue;
+
+            // 计算除息日持仓数量（ex_date 前一天收盘持有）
+            BigDecimal sharesOnExDate = getHoldingOnDate(portfolioId, stock.id(), dh.exDate().minusDays(1));
+            if (sharesOnExDate.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            // 创建 user_dividend 记录
+            int sharesHeld = sharesOnExDate.setScale(0, RoundingMode.DOWN).intValue();
+            BigDecimal grossAmount = dh.dividendPerShare()
+                    .multiply(BigDecimal.valueOf(sharesHeld))
+                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal taxRate = dividendService.getTaxRate(dh.symbol());
+            BigDecimal netAmount = grossAmount
+                    .multiply(BigDecimal.ONE.subtract(taxRate))
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            UserDividend userDividend = new UserDividend(
+                    null,               // id (auto-generated)
+                    portfolioId,
+                    dh.symbol(),
+                    dh.exDate(),
+                    dh.payDate(),
+                    sharesHeld,
+                    dh.dividendPerShare(),
+                    grossAmount,
+                    taxRate,
+                    netAmount,
+                    "pending",          // status
+                    null,               // paidAt
+                    null                // createdAt
+            );
+            userDividendRepository.save(userDividend);
+            log.info("Created dividend record: {} {} shares={}, gross={}, net={}",
+                    dh.symbol(), dh.exDate(), sharesHeld, grossAmount, netAmount);
+        }
+
+        // 处理派息日到账：将 pending 且 pay_date <= today 的分红加到现金余额
+        List<UserDividend> pendingToPay = userDividendRepository.findPendingDividends(portfolioId, today);
+        if (!pendingToPay.isEmpty()) {
+            Portfolio portfolio = portfolioRepository.findById(portfolioId).orElseThrow();
+            BigDecimal cashBalance = portfolio.cashBalance();
+
+            for (UserDividend ud : pendingToPay) {
+                cashBalance = cashBalance.add(ud.netAmount());
+                userDividendRepository.markAsPaid(ud.id());
+                log.info("Dividend paid: {} net={} added to cash, new balance={}",
+                        ud.symbol(), ud.netAmount(), cashBalance);
+            }
+
+            portfolioRepository.updateCashBalance(portfolioId, cashBalance);
+        }
+    }
+
+    /**
+     * 计算某只股票在指定日期（含）之前的持仓数量。
+     * 通过遍历该日期之前（含）的所有交易记录，累加买入、减去卖出得到。
+     */
+    private BigDecimal getHoldingOnDate(Long portfolioId, Long stockId, LocalDate date) {
+        List<Transaction> transactions = transactionRepository
+                .findByPortfolioIdAndStockIdBeforeDate(portfolioId, stockId, date);
+
+        if (transactions.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+
+        BigDecimal quantity = BigDecimal.ZERO;
+        for (Transaction tx : transactions) {
+            if ("BUY".equals(tx.type())) {
+                quantity = quantity.add(tx.quantity());
+            } else if ("SELL".equals(tx.type())) {
+                quantity = quantity.subtract(tx.quantity());
+            }
+        }
+
+        return quantity;
     }
 
     @Override
@@ -160,9 +249,8 @@ public class PortfolioServiceImpl implements PortfolioService {
                     ? profit.multiply(BigDecimal.valueOf(100)).divide(cost, 2, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
 
-            // 年化分红：需要考虑除息日是否在持仓期间
-            BigDecimal annualDividend = calculateAnnualDividendWithDividendDate(
-                    portfolioId, stock, holding.quantity(), currentPrice);
+            // 该持仓的已到账分红：从 user_dividend 表查
+            BigDecimal holdingDividend = calculateHoldingDividend(portfolioId, stock.symbol());
 
             responses.add(new HoldingResponse(
                     stock.id(),
@@ -175,11 +263,23 @@ public class PortfolioServiceImpl implements PortfolioService {
                     marketValue,
                     profit,
                     profitPercent,
-                    annualDividend
+                    holdingDividend
             ));
         }
 
         return responses;
+    }
+
+    /**
+     * 计算某个持仓标的的累计已到账分红。
+     */
+    private BigDecimal calculateHoldingDividend(Long portfolioId, String symbol) {
+        List<UserDividend> dividends = userDividendRepository
+                .findByPortfolioIdAndDateRange(portfolioId, LocalDate.of(2025, 1, 1), LocalDate.now());
+        return dividends.stream()
+                .filter(d -> d.symbol().equals(symbol))
+                .map(UserDividend::netAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     @Override
@@ -187,7 +287,6 @@ public class PortfolioServiceImpl implements PortfolioService {
         List<PortfolioSnapshot> snapshots = snapshotRepository.findByPortfolioIdOrderBySnapshotDateDesc(portfolioId, 7);
 
         if (!snapshots.isEmpty()) {
-            // 有快照数据，用快照计算（原有逻辑）
             List<PortfolioSnapshot> ordered = new ArrayList<>(snapshots);
             Collections.reverse(ordered);
 
@@ -219,134 +318,12 @@ public class PortfolioServiceImpl implements PortfolioService {
             return result;
         }
 
-        // 没有快照数据，用持仓 + 7天价格历史实时回算
         return computeWeeklyPerformanceFromHoldings(portfolioId);
-    }
-
-    /**
-     * 计算年化分红，考虑除息日判断。
-     * 
-     * 规则：
-     * 1. 如果股票没有除息日或股息率为0，分红为0
-     * 2. 如果有除息日，查询除息日当天的持仓数量
-     * 3. 如果除息日当天持有该股票（数量 > 0），分红 = 持仓数量 × 除息日价格 × 股息率
-     * 4. 如果除息日当天没有持有（数量为0），分红为0
-     */
-    private BigDecimal calculateAnnualDividendWithDividendDate(Long portfolioId, Stock stock, 
-            BigDecimal currentQuantity, BigDecimal currentPrice) {
-        // 没有除息日或股息率为0，不产生分红
-        if (stock.dividendDate() == null || stock.dividendYield().compareTo(BigDecimal.ZERO) == 0) {
-            return BigDecimal.ZERO;
-        }
-        
-        // 查询除息日当天的持仓数量
-        BigDecimal holdingOnDividendDate = getHoldingOnDate(portfolioId, stock.id(), stock.dividendDate());
-        
-        // 除息日当天没有持有该股票，没有分红
-        if (holdingOnDividendDate.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO;
-        }
-        
-        // 获取除息日当天的价格（收盘价）
-        BigDecimal priceOnDividendDate = priceService.getPriceOnDate(stock.symbol(), stock.dividendDate());
-        
-        // 除息日当天持有，计算分红 = 除息日持仓数量 × 除息日价格 × 股息率
-        BigDecimal marketValueOnDividendDate = priceOnDividendDate.multiply(holdingOnDividendDate)
-                .setScale(2, RoundingMode.HALF_UP);
-        return marketValueOnDividendDate.multiply(stock.dividendYield()).setScale(2, RoundingMode.HALF_UP);
-    }
-    
-    /**
-     * 计算某只股票在指定日期当天的持仓数量。
-     * 通过遍历该日期之前（含）的所有交易记录，累加买入、减去卖出得到。
-     * 如果没有交易记录，则使用当前持仓数量（假设一直持有）。
-     */
-    private BigDecimal getHoldingOnDate(Long portfolioId, Long stockId, LocalDate date) {
-        List<Transaction> transactions = transactionRepository
-                .findByPortfolioIdAndStockIdBeforeDate(portfolioId, stockId, date);
-        
-        // 没有任何交易记录，说明该股票一直是初始状态（没有持仓），返回0
-        if (transactions.isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-        
-        // 遍历交易记录，计算除息日当天的持仓数量
-        BigDecimal quantity = BigDecimal.ZERO;
-        for (Transaction tx : transactions) {
-            if ("BUY".equals(tx.type())) {
-                quantity = quantity.add(tx.quantity());
-            } else if ("SELL".equals(tx.type())) {
-                quantity = quantity.subtract(tx.quantity());
-            }
-        }
-        
-        return quantity;
-    }
-
-    /**
-     * 计算已清仓股票的分红。
-     * 遍历所有交易记录，找出曾经持有但当前已清仓的股票，
-     * 检查除息日当天是否持有，如果有则计算分红。
-     */
-    private BigDecimal calculateDividendsForClosedPositions(Long portfolioId, List<Holding> currentHoldings) {
-        // 获取当前持仓的 stockId 集合
-        Set<Long> currentStockIds = currentHoldings.stream()
-                .map(Holding::stockId)
-                .collect(Collectors.toSet());
-        
-        // 获取所有交易记录
-        List<Transaction> allTransactions = transactionRepository.findByPortfolioId(portfolioId);
-        
-        // 提取所有曾经持有的 stockId
-        Set<Long> allTradedStockIds = allTransactions.stream()
-                .map(Transaction::stockId)
-                .collect(Collectors.toSet());
-        
-        // 找出已清仓的 stockId（曾经持有但当前不在持仓中）
-        Set<Long> closedPositionStockIds = new HashSet<>(allTradedStockIds);
-        closedPositionStockIds.removeAll(currentStockIds);
-        
-        if (closedPositionStockIds.isEmpty()) {
-            return BigDecimal.ZERO;
-        }
-        
-        // 对每支已清仓的股票，检查除息日是否持有过
-        BigDecimal totalDividend = BigDecimal.ZERO;
-        for (Long stockId : closedPositionStockIds) {
-            Stock stock = stockRepository.findById(stockId).orElse(null);
-            if (stock == null) continue;
-            
-            // 没有除息日或股息率为0，不产生分红
-            if (stock.dividendDate() == null || stock.dividendYield().compareTo(BigDecimal.ZERO) == 0) {
-                continue;
-            }
-            
-            // 查询除息日当天的持仓数量
-            BigDecimal holdingOnDividendDate = getHoldingOnDate(portfolioId, stockId, stock.dividendDate());
-            
-            // 除息日当天持有该股票，计算分红
-            if (holdingOnDividendDate.compareTo(BigDecimal.ZERO) > 0) {
-                // 获取除息日当天的价格（收盘价）
-                BigDecimal priceOnDividendDate = priceService.getPriceOnDate(stock.symbol(), stock.dividendDate());
-                BigDecimal marketValue = priceOnDividendDate.multiply(holdingOnDividendDate)
-                        .setScale(2, RoundingMode.HALF_UP);
-                BigDecimal dividend = marketValue.multiply(stock.dividendYield())
-                        .setScale(2, RoundingMode.HALF_UP);
-                totalDividend = totalDividend.add(dividend);
-            }
-        }
-        
-        return totalDividend;
     }
 
     /**
      * 当 portfolio_snapshot 表为空时，根据当前持仓和模拟价格历史
      * 反推过去 7 天每天的组合总价值，计算每日盈亏和收益率。
-     *
-     * 计算逻辑：
-     *   每天组合价值 = Σ(持仓数量 × 该标的当天收盘价) + 现金余额
-     *   每日盈亏 = 当天组合价值 - 前一天组合价值（第一天为0）
-     *   收益率 = (当天组合价值 - 第一天组合价值) / 第一天组合价值 × 100
      */
     private List<WeeklyPerformanceResponse> computeWeeklyPerformanceFromHoldings(Long portfolioId) {
         List<Holding> holdings = holdingRepository.findByPortfolioId(portfolioId);
@@ -355,8 +332,6 @@ public class PortfolioServiceImpl implements PortfolioService {
             return List.of();
         }
 
-        // 获取每支持仓标的的 7 天价格历史
-        // Map<symbol, List<PriceHistoryResponse>>
         Map<String, List<PriceHistoryResponse>> priceHistories = new LinkedHashMap<>();
         for (Holding holding : holdings) {
             Stock stock = stockRepository.findById(holding.stockId()).orElse(null);
@@ -364,15 +339,12 @@ public class PortfolioServiceImpl implements PortfolioService {
             priceHistories.put(stock.symbol(), priceService.getSevenDayPriceHistory(stock.symbol()));
         }
 
-        // 获取现金余额
         Portfolio portfolio = portfolioRepository.findById(portfolioId).orElseThrow();
         BigDecimal cashBalance = portfolio.cashBalance();
 
-        // 确定 7 天日期（取第一支标的的日期序列）
         List<PriceHistoryResponse> referenceDates = priceHistories.values().iterator().next();
         int days = referenceDates.size();
 
-        // 对每一天，计算组合总价值
         List<WeeklyPerformanceResponse> result = new ArrayList<>();
         BigDecimal firstDayValue = null;
 
@@ -380,7 +352,6 @@ public class PortfolioServiceImpl implements PortfolioService {
             LocalDate date = referenceDates.get(dayIdx).date();
             BigDecimal dayHoldingsValue = BigDecimal.ZERO;
 
-            // 累加每支持仓当天的市值
             for (Holding holding : holdings) {
                 Stock stock = stockRepository.findById(holding.stockId()).orElse(null);
                 if (stock == null) continue;
@@ -398,7 +369,6 @@ public class PortfolioServiceImpl implements PortfolioService {
                 firstDayValue = totalValue;
             }
 
-            // 每日盈亏
             BigDecimal dailyProfit;
             if (dayIdx == 0) {
                 dailyProfit = BigDecimal.ZERO;
@@ -407,7 +377,6 @@ public class PortfolioServiceImpl implements PortfolioService {
                 dailyProfit = totalValue.subtract(prevValue).setScale(2, RoundingMode.HALF_UP);
             }
 
-            // 累计收益率
             BigDecimal returnRate = firstDayValue.compareTo(BigDecimal.ZERO) > 0
                     ? totalValue.subtract(firstDayValue)
                             .multiply(BigDecimal.valueOf(100))

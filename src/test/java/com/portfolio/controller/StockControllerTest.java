@@ -35,15 +35,14 @@ class StockControllerTest {
     @MockBean
     private PriceService priceService;
 
-    private final Stock aapl = new Stock(1L, "AAPL", "Apple Inc.", "STOCK", "Technology", "NASDAQ", "USD",
-            new BigDecimal("0.0050"), LocalDate.of(2026, 5, 10));
+    private final Stock aapl = new Stock(1L, "AAPL", "Apple Inc.", "STOCK", "Technology", "NASDAQ", "USD");
 
     @Test
     @DisplayName("GET /api/stocks returns 200 and a JSON array with prices")
     void getAll_returns200() throws Exception {
         StockInfoResponse response = new StockInfoResponse(
                 1L, "AAPL", "Apple Inc.", "STOCK", "Technology", "NASDAQ",
-                new BigDecimal("195.50"), new BigDecimal("1.25"), new BigDecimal("0.0050"));
+                new BigDecimal("195.50"), new BigDecimal("1.25"));
         when(stockService.getAllStocksWithPrice()).thenReturn(List.of(response));
 
         mockMvc.perform(get("/api/stocks"))
