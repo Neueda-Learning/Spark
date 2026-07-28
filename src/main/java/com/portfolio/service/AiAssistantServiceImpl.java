@@ -380,7 +380,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
 
         // If user asks general market analysis without explicit symbol match,
         // include broader candidates so major symbols like TSLA are still covered.
-        if (symbols.size() <= 3) {
+        if (symbols.size() <= 3 && detectContextScope(question).includeMarketCandidates()) {
             availableStocks.stream()
                     .map(AiAssistantRepository.AvailableStockRow::symbol)
                     .filter(s -> s != null && !s.isBlank())
