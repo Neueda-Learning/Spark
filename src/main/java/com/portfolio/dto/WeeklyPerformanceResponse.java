@@ -9,7 +9,6 @@ import java.time.LocalDate;
 public record WeeklyPerformanceResponse(
         LocalDate date,
         BigDecimal totalValue,
-        
         BigDecimal dailyProfit,
         BigDecimal returnRate
 ) {}

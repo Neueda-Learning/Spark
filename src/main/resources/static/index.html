@@ -537,8 +537,19 @@ function fmtPct(n) {
     return (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%';
 }
 function pnlClass(n) { return n >= 0 ? 'positive' : 'negative'; }
+function escapeHtml(value) {
+     return String(value).replace(/[&<>"']/g, ch => ({
+         '&': '&amp;',
+         '<': '&lt;',
+         '>': '&gt;',
+         '"': '&quot;',
+         "'": '&#39;'
+     }[ch]));
+ }
 function createMetricPill(label, value, className) {
-    return '<div class="metric-pill' + (className ? ' ' + className : '') + '"><span class="k">' + label + '</span><span class="v">' + value + '</span></div>';
+    const safeLabel = escapeHtml(label);
+    const safeValue = escapeHtml(value);
+    return '<div class="metric-pill' + (className ? ' ' + className : '') + '"><span class="k">' + safeLabel + '</span><span class="v">' + safeValue + '</span></div>';
 }
 // ---------- Tab switching ----------
 document.querySelectorAll('.tab-btn').forEach(btn => {
