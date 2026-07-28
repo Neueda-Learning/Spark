@@ -104,6 +104,19 @@ public class SimulatedPriceService implements PriceService {
         return history;
     }
 
+    @Override
+    public BigDecimal getPriceOnDate(String symbol, LocalDate date) {
+        BigDecimal base = BASE_PRICES.getOrDefault(symbol, new BigDecimal("100.00"));
+        // Cash items don't fluctuate
+        if ("USD".equals(symbol) || "USDMONEY".equals(symbol)) {
+            return base;
+        }
+        // Use date's day-of-year as seed offset for deterministic price
+        int dayOffset = date.getDayOfYear() + date.getYear() * 365;
+        double variation = 1.0 + (seededRandom(symbol, dayOffset) * 0.06 - 0.03); // ±3%
+        return base.multiply(BigDecimal.valueOf(variation)).setScale(2, RoundingMode.HALF_UP);
+    }
+
     /**
      * Generates a deterministic double between 0.0 and 1.0 for a given symbol and seed offset.
      */

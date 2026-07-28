@@ -15,5 +15,6 @@ public record HoldingResponse(
         BigDecimal currentPrice,
         BigDecimal marketValue,
         BigDecimal profit,
-        BigDecimal profitPercent
+        BigDecimal profitPercent,
+        BigDecimal cumulativeDividend
 ) {}

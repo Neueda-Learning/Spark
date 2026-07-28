@@ -1,5 +1,6 @@
 package com.portfolio.model;
 
+
 /**
  * Represents an investment item (stock, bond, or cash equivalent).
  */
