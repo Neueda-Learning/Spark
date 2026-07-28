@@ -99,7 +99,7 @@ public class HttpLlmGateway implements LlmGateway {
         try {
             HttpResponse<Stream<String>> response = httpClient.send(request, HttpResponse.BodyHandlers.ofLines());
             if (response.statusCode() >= 400) {
-                String errorBody = response.body().reduce("", (left, right) -> left + right);
+                String errorBody = response.body().collect(java.util.stream.Collectors.joining());
                 throw new IllegalStateException("LLM provider returned status " + response.statusCode() + ": " + errorBody);
             }
 
