@@ -66,6 +66,7 @@ public class PortfolioServiceImpl implements PortfolioService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public PortfolioOverviewResponse getPortfolioOverview(Long portfolioId) {
        
 
