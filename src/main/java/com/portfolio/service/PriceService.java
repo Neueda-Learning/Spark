@@ -22,7 +22,7 @@ public interface PriceService {
 
     /**
      * Get the closing price for a stock on a specific date.
-     * Used for dividend calculation based on ex-dividend date price.
+     * Used for historical calculations (e.g., performance replay/backfills).
      */
     BigDecimal getPriceOnDate(String symbol, LocalDate date);
     default LocalDate getPriceDate(String symbol) {
