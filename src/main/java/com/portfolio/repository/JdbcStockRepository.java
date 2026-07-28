@@ -24,9 +24,7 @@ public class JdbcStockRepository implements StockRepository {
             rs.getString("asset_type"),
             rs.getString("sector"),
             rs.getString("exchange"),
-            rs.getString("currency"),
-            rs.getBigDecimal("dividend_yield"),
-            rs.getDate("dividend_date") != null ? rs.getDate("dividend_date").toLocalDate() : null
+            rs.getString("currency")     
     );
 
     @Override

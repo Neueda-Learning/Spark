@@ -12,7 +12,8 @@ public record PortfolioOverviewResponse(
         BigDecimal totalProfit,
         BigDecimal returnRate,
         BigDecimal cashBalance,
-        BigDecimal totalAnnualDividend,
+        BigDecimal totalDividendPaid,       // 已到账分红（已加到现金余额）
+        BigDecimal totalDividendPending,    // 待到账分红（除息日已过，派息日未到）
         List<AssetAllocation> allocation
 ) {
     public record AssetAllocation(

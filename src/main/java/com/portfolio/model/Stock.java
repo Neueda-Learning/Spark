@@ -1,6 +1,5 @@
 package com.portfolio.model;
-import java.math.BigDecimal;
-import java.time.LocalDate;
+
 
 /**
  * Represents an investment item (stock, bond, or cash equivalent).
@@ -12,7 +11,5 @@ public record Stock(
         String assetType,
         String sector,
         String exchange,
-        String currency,
-        BigDecimal dividendYield,
-        LocalDate dividendDate
+        String currency
 ) {}
