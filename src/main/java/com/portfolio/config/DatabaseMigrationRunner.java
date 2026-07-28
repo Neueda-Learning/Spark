@@ -39,18 +39,24 @@ public class DatabaseMigrationRunner implements CommandLineRunner {
     }
 
     private void removeColumnIfExists(String table, String column) {
-        try {
-            jdbc.queryForObject("SELECT " + column + " FROM " + table + " LIMIT 1", String.class);
-            // Column exists, try to drop it
-            try {
-                jdbc.execute("ALTER TABLE " + table + " DROP COLUMN " + column);
-                log.info("Removed column {} from table {}", column, table);
-            } catch (Exception e) {
-                log.warn("Could not drop column {}.{}: {}", table, column, e.getMessage());
-            }
-        } catch (Exception e) {
-            // Column doesn't exist, nothing to do
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS " +
+                        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                Integer.class,
+                table,
+                column
+        );
+
+        if (count == null || count == 0) {
             log.debug("Column {}.{} does not exist, skipping removal", table, column);
+            return;
+        }
+
+        try {
+            jdbc.execute("ALTER TABLE " + table + " DROP COLUMN " + column);
+            log.info("Removed column {} from table {}", column, table);
+        } catch (Exception e) {
+            log.warn("Could not drop column {}.{}: {}", table, column, e.getMessage());
         }
     }
 
