@@ -7,7 +7,6 @@ import com.portfolio.model.Portfolio;
 import com.portfolio.model.Stock;
 import com.portfolio.model.Transaction;
 import com.portfolio.repository.HoldingRepository;
-import com.portfolio.repository.PortfolioPerformanceCacheRepository;
 import com.portfolio.repository.PortfolioRepository;
 import com.portfolio.repository.StockRepository;
 import com.portfolio.repository.TransactionRepository;
@@ -41,9 +40,6 @@ class TransactionServiceImplTest {
 
     @Mock
     private TransactionRepository transactionRepository;
-
-    @Mock
-    private PortfolioPerformanceCacheRepository performanceCacheRepository;
 
     @Mock
     private PriceService priceService;
@@ -84,7 +80,6 @@ class TransactionServiceImplTest {
 
         verify(holdingRepository).save(any(Holding.class));
         verify(portfolioRepository).updateCashBalance(eq(1L), eq(new BigDecimal("98045.00")));
-        verify(performanceCacheRepository).deleteByPortfolioId(1L);
     }
 
     @Test
@@ -108,7 +103,6 @@ class TransactionServiceImplTest {
         assertThat(result.type()).isEqualTo("BUY");
         // New avg cost = (5*180 + 5*195.50) / 10 = (900 + 977.50) / 10 = 187.75
         verify(holdingRepository).updateQuantityAndAverageCost(1L, new BigDecimal("10"), new BigDecimal("187.7500"));
-        verify(performanceCacheRepository).deleteByPortfolioId(1L);
     }
 
     @Test
@@ -151,7 +145,6 @@ class TransactionServiceImplTest {
         assertThat(result.quantity()).isEqualByComparingTo(new BigDecimal("3"));
         verify(holdingRepository).updateQuantityAndAverageCost(1L, new BigDecimal("7"), new BigDecimal("180.00"));
         verify(portfolioRepository).updateCashBalance(eq(1L), eq(new BigDecimal("100586.50")));
-        verify(performanceCacheRepository).deleteByPortfolioId(1L);
     }
 
     @Test
@@ -173,7 +166,6 @@ class TransactionServiceImplTest {
         service.executeTransaction(1L, request);
 
         verify(holdingRepository).deleteById(1L);
-        verify(performanceCacheRepository).deleteByPortfolioId(1L);
     }
 
     @Test
