@@ -520,7 +520,7 @@ GET /api/stocks/{id}/candles?interval=MONTHLY&limit=60
 
 - `src/main/resources/static/index.html`
 
-本次不同时修改仓库根目录下尚未接入构建链的 React/TypeScript 源码，避免形成两套未同步实现。
+仓库根目录下未接入构建链的 React/TypeScript 前端源码已删除，避免维护两套未同步实现。后续 K 线功能和页面修复只修改实际运行的静态前端。
 
 ### 9.2 交互
 
@@ -701,6 +701,10 @@ Tooltip 展示：
 - 空数据、请求失败和加载状态正确；
 - 图表在不同窗口宽度下正常；
 - 关闭弹窗后无残留图表或事件。
+- Tab 可通过左右方向键、Home 和 End 切换，并保持正确焦点；
+- Tab 与图表面板通过 ARIA 属性建立控制关系；
+- loading、空数据和错误状态可由辅助技术读取；
+- API 返回的动态文本不会未经转义写入 `innerHTML`。
 
 ## 12. 预计文件改动
 
@@ -734,6 +738,13 @@ Tooltip 展示：
 - `src/main/java/com/portfolio/dto/CandleResponse.java`
 - `src/main/java/com/portfolio/dto/CandleSeriesResponse.java`
 - 对应的测试文件
+
+### 12.3 已删除的废弃文件
+
+- `src/main/java/com/portfolio/dto/PriceHistoryResponse.java`：旧七日悬停折线图 DTO。
+- 仓库根目录下未接入构建链的 React/TypeScript 页面文件：实际页面由 `src/main/resources/static/index.html` 提供，删除后避免形成两套前端实现。
+
+同时从 `StockController`、`PriceService`、`DatabasePriceService` 和 `SimulatedPriceService` 中移除了旧七日价格接口及相关实现。
 
 ## 13. 分阶段实施计划
 
@@ -833,7 +844,7 @@ Tooltip 展示：
 
 ### 14.4 回归验收
 
-- 现有 17 个测试继续通过；
+- 当前 37 个测试全部通过；
 - 组合总览、持仓列表和交易仍可使用；
 - 买入现金不足、卖出持仓不足等规则保持不变；
 - 不修改默认组合 `portfolio_id = 1` 的现有行为。
@@ -873,7 +884,94 @@ Tooltip 展示：
 - 通过显式配置触发首次回填；
 - 时间允许则引入 Testcontainers，否则完成一次开发库端到端验证。
 
-## 17. 外部参考
+## 17. PR Review 整改记录
+
+本节记录多周期 K 线实现完成后，根据 PR review 追加的代码质量、安全性和无障碍修正。以下修改均以 `dev/roooonj` 上的 Yahoo 真实行情与多周期 K 线实现为基础，没有恢复模拟行情或旧七日悬停折线图。
+
+### 17.1 行情任务与运行 profile 隔离
+
+问题：
+
+- `MarketDataScheduler` 和 `MarketDataBackfillRunner` 仅通过配置开关控制；
+- demo/test 环境如果误开配置，可能触发真实 Yahoo 请求或写入真实行情表。
+
+修正：
+
+- 两个入口增加 `@Profile("!demo & !test")`；
+- 默认真实数据模式下仍可按配置启用调度和启动回填；
+- demo/test profile 下即使配置值为 `true`，也不会创建对应 Bean；
+- 新增 `MarketDataEntryPointProfileTest`，覆盖默认、demo 和 test 三种 profile。
+
+### 17.2 前端动态内容与事件绑定安全
+
+问题：
+
+- 持仓和市场列表通过字符串拼接生成 HTML，API 返回的股票名称、代码、板块等字段存在进入 `innerHTML` 的风险；
+- 行点击和买卖按钮曾通过内联 `onclick` 拼接参数，字符串字段可能破坏属性或脚本边界；
+- 非法股票 ID 不应进入 DOM 事件参数。
+
+修正：
+
+- 增加并统一使用 `escapeHtml`，转义股票代码、名称、资产类型、板块、价格日期和数据来源等动态文本；
+- 将股票 ID 转为数字，并要求为大于零的安全整数；
+- 使用 `data-candle-stock-id`、`data-trade-stock-id` 和 `data-trade-type` 保存经过约束的事件数据；
+- 移除动态生成的内联 `onclick`，在持仓和市场列表容器上使用事件委托；
+- 买卖按钮仍阻止行点击冒泡，避免同时打开 K 线弹窗；
+- Tooltip 中来自 candles API 的日期、价格、涨跌和成交量文本在写入 `innerHTML` 前全部经过 `escapeHtml`，关闭 DOM XSS sink。
+
+### 17.3 周期切换的异步竞态防护
+
+问题：
+
+- 用户快速切换股票或日、周、月周期时，较慢的旧请求可能晚于新请求返回并覆盖当前图表。
+
+修正：
+
+- 每次加载前中止上一个 `AbortController`；
+- 每个请求保留独立 controller，并在成功和失败分支检查其是否仍为当前请求；
+- 只有当前请求可以更新 K 线数据、标题和错误状态；
+- 关闭弹窗时中止请求并清理股票、周期、图表布局、Tooltip 和 Canvas 状态。
+
+### 17.4 K 线周期 Tab 无障碍
+
+问题：
+
+- Tab 使用了 `tablist`/`tab` 角色，但没有声明受控的 `tabpanel`；
+- 仅能点击切换，不完整符合 ARIA Tabs Pattern。
+
+修正：
+
+- 日线、周线和月线 Tab 分别增加稳定 `id`；
+- Tab 通过 `aria-controls="candle-panel"` 指向共享图表面板；
+- 图表容器增加 `role="tabpanel"`，并动态更新 `aria-labelledby`；
+- 切换时同步更新 `aria-selected` 和 roving `tabindex`；
+- 支持方向键、Home 和 End 切换并移动焦点；
+- 加载、空数据和错误区域增加 `role="status"` 与 `aria-live="polite"`。
+
+### 17.5 废弃链路和重复前端清理
+
+- 删除未实际完成的鼠标悬停七日折线图；
+- 删除 `GET /api/stocks/{id}/prices`、`PriceHistoryResponse` 和 PriceService 中对应方法；
+- 删除 DatabasePriceService 与 SimulatedPriceService 中仅为旧折线图服务的七日历史实现；
+- 删除仓库根目录下未接入构建链的 React/TypeScript 页面源码，明确静态 `index.html` 是当前唯一运行前端。
+
+### 17.6 对应提交与验证
+
+| 提交 | 内容 |
+|---|---|
+| `d060ca5` | 多周期 K 线、旧悬停链路清理、profile 隔离、前端事件与动态内容安全、请求竞态防护及相关测试 |
+| `f4c63ba` | K 线 Tab 与 panel 的 ARIA 关系、键盘操作、焦点和状态播报 |
+| `dd06ccc` | Tooltip API 动态字段统一转义，消除 DOM XSS sink |
+
+最终验证结果：
+
+- `mvn test`：37 个测试通过，0 failure，0 error；
+- 内联 JavaScript 语法检查通过；
+- `git diff --check` 通过。
+
+数据库凭据管理不属于本轮 review 整改范围，按团队决定另行治理；本文档不记录任何凭据值。
+
+## 18. 外部参考
 
 - YahooFinanceAPI 项目说明：<https://github.com/sstrickx/yahoofinance-api>
 - YahooFinanceAPI Releases：<https://github.com/sstrickx/yahoofinance-api/releases>
