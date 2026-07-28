@@ -17,6 +17,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 @Service
 public class CandleServiceImpl implements CandleService {
@@ -33,48 +34,100 @@ public class CandleServiceImpl implements CandleService {
     }
 
     @Override
-    public CandleSeriesResponse getWeeklyCandles(Long stockId, int weeks) {
+    public CandleSeriesResponse getCandles(Long stockId, CandleInterval interval, int limit) {
         Stock stock = stockRepository.findById(stockId)
                 .orElseThrow(() -> new IllegalArgumentException("Stock not found: " + stockId));
         if ("CASH".equals(stock.assetType())) {
-            return new CandleSeriesResponse(stock.id(), stock.symbol(), "WEEKLY", "FIXED", null, List.of());
+            return new CandleSeriesResponse(
+                    stock.id(),
+                    stock.symbol(),
+                    interval.name(),
+                    "FIXED",
+                    null,
+                    List.of()
+            );
         }
 
         List<MarketPriceDaily> dailyPrices = new ArrayList<>(
-                marketPriceRepository.findRecentByStockId(stockId, weeks * 7 + 7)
+                marketPriceRepository.findRecentByStockId(stockId, queryLimit(interval, limit))
         );
         if (dailyPrices.isEmpty()) {
-            return new CandleSeriesResponse(stock.id(), stock.symbol(), "WEEKLY", null, null, List.of());
+            return new CandleSeriesResponse(
+                    stock.id(),
+                    stock.symbol(),
+                    interval.name(),
+                    null,
+                    null,
+                    List.of()
+            );
         }
         Collections.reverse(dailyPrices);
 
-        Map<LocalDate, WeeklyAccumulator> weekly = new LinkedHashMap<>();
-        for (MarketPriceDaily price : dailyPrices) {
-            LocalDate weekStart = price.tradeDate()
-                    .with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-            weekly.computeIfAbsent(weekStart, ignored -> new WeeklyAccumulator())
-                    .add(price);
-        }
-
-        List<CandleResponse> candles = weekly.entrySet().stream()
-                .map(entry -> entry.getValue().toResponse(entry.getKey()))
-                .toList();
-        if (candles.size() > weeks) {
-            candles = new ArrayList<>(candles.subList(candles.size() - weeks, candles.size()));
-        }
+        List<CandleResponse> candles = switch (interval) {
+            case DAILY -> dailyPrices.stream()
+                    .map(this::toDailyCandle)
+                    .toList();
+            case WEEKLY -> aggregate(
+                    dailyPrices,
+                    date -> date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            );
+            case MONTHLY -> aggregate(dailyPrices, date -> date.withDayOfMonth(1));
+        };
+        candles = takeLast(candles, limit);
 
         MarketPriceDaily latest = dailyPrices.getLast();
         return new CandleSeriesResponse(
                 stock.id(),
                 stock.symbol(),
-                "WEEKLY",
+                interval.name(),
                 latest.source(),
                 latest.tradeDate(),
                 candles
         );
     }
 
-    private static final class WeeklyAccumulator {
+    private int queryLimit(CandleInterval interval, int limit) {
+        return switch (interval) {
+            case DAILY -> limit;
+            case WEEKLY -> limit * 7 + 7;
+            case MONTHLY -> limit * 31 + 31;
+        };
+    }
+
+    private CandleResponse toDailyCandle(MarketPriceDaily price) {
+        return new CandleResponse(
+                price.tradeDate(),
+                price.openPrice(),
+                price.highPrice(),
+                price.lowPrice(),
+                price.closePrice(),
+                price.adjustedClose(),
+                price.volume()
+        );
+    }
+
+    private List<CandleResponse> aggregate(
+            List<MarketPriceDaily> dailyPrices,
+            Function<LocalDate, LocalDate> periodStart
+    ) {
+        Map<LocalDate, CandleAccumulator> periods = new LinkedHashMap<>();
+        for (MarketPriceDaily price : dailyPrices) {
+            LocalDate key = periodStart.apply(price.tradeDate());
+            periods.computeIfAbsent(key, ignored -> new CandleAccumulator()).add(price);
+        }
+        return periods.entrySet().stream()
+                .map(entry -> entry.getValue().toResponse(entry.getKey()))
+                .toList();
+    }
+
+    private List<CandleResponse> takeLast(List<CandleResponse> candles, int limit) {
+        if (candles.size() <= limit) {
+            return candles;
+        }
+        return new ArrayList<>(candles.subList(candles.size() - limit, candles.size()));
+    }
+
+    private static final class CandleAccumulator {
         private BigDecimal open;
         private BigDecimal high;
         private BigDecimal low;

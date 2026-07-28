@@ -1,12 +1,10 @@
 package com.portfolio.service;
 
-import com.portfolio.dto.PriceHistoryResponse;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.util.*;
 
 /**
@@ -67,36 +65,6 @@ public class SimulatedPriceService implements PriceService {
         // Deterministic change percent based on symbol
         double change = seededRandom(symbol, 1) * 6 - 3; // -3% to +3%
         return BigDecimal.valueOf(change).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    @Override
-    public List<PriceHistoryResponse> getSevenDayPriceHistory(String symbol) {
-        BigDecimal base = BASE_PRICES.getOrDefault(symbol, new BigDecimal("100.00"));
-        boolean isCash = "USD".equals(symbol) || "USDMONEY".equals(symbol);
-        List<PriceHistoryResponse> history = new ArrayList<>();
-        LocalDate today = LocalDate.now();
-
-        for (int i = 6; i >= 0; i--) {
-            LocalDate date = today.minusDays(i);
-            double dayVariation;
-            if (isCash) {
-                dayVariation = 1.0;
-            } else {
-                // Deterministic variation per day
-                dayVariation = 1.0 + (seededRandom(symbol, i + 10) * 0.06 - 0.03); // ±3%
-            }
-            BigDecimal close = base.multiply(BigDecimal.valueOf(dayVariation)).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal open = base.multiply(BigDecimal.valueOf(1.0 + (seededRandom(symbol, i + 20) * 0.04 - 0.02)))
-                    .setScale(2, RoundingMode.HALF_UP);
-            BigDecimal high = close.max(open).multiply(BigDecimal.valueOf(1.0 + seededRandom(symbol, i + 30) * 0.01))
-                    .setScale(2, RoundingMode.HALF_UP);
-            BigDecimal low = close.min(open).multiply(BigDecimal.valueOf(1.0 - seededRandom(symbol, i + 40) * 0.01))
-                    .setScale(2, RoundingMode.HALF_UP);
-            long volume = isCash ? 0L : (long) (5_000_000 + seededRandom(symbol, i + 50) * 45_000_000);
-
-            history.add(new PriceHistoryResponse(date, open, close, high, low, volume));
-        }
-        return history;
     }
 
     /**

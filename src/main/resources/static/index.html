@@ -262,6 +262,30 @@
         }
         .candle-modal-header h3 { margin: 0 0 5px; }
         .candle-subtitle { color: #64748b; font-size: 13px; }
+        .candle-interval-tabs {
+            display: inline-flex;
+            gap: 4px;
+            padding: 4px;
+            margin-bottom: 12px;
+            border-radius: 9px;
+            background: #f1f5f9;
+        }
+        .candle-interval-tab {
+            border: 0;
+            border-radius: 7px;
+            padding: 6px 16px;
+            color: #64748b;
+            background: transparent;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        .candle-interval-tab:hover { color: #1d4ed8; }
+        .candle-interval-tab.active {
+            color: #1d4ed8;
+            background: #fff;
+            box-shadow: 0 1px 4px rgba(15,23,42,.12);
+        }
         .candle-close {
             border: 0;
             background: #f1f5f9;
@@ -284,6 +308,36 @@
             display: block;
             width: 100%;
             height: 430px;
+            cursor: crosshair;
+        }
+        .candle-tooltip {
+            display: none;
+            position: absolute;
+            z-index: 3;
+            min-width: 190px;
+            padding: 10px 12px;
+            border: 1px solid #dbeafe;
+            border-radius: 9px;
+            color: #334155;
+            background: rgba(255,255,255,.97);
+            box-shadow: 0 6px 20px rgba(15,23,42,.16);
+            pointer-events: none;
+            font-size: 12px;
+        }
+        .candle-tooltip-title {
+            margin-bottom: 7px;
+            color: #0f172a;
+            font-weight: 700;
+        }
+        .candle-tooltip-grid {
+            display: grid;
+            grid-template-columns: auto auto;
+            gap: 4px 14px;
+        }
+        .candle-tooltip-grid span:nth-child(even) {
+            color: #0f172a;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
         }
         .candle-status {
             position: absolute;
@@ -297,19 +351,6 @@
             text-align: center;
         }
         .candle-status.error { color: #dc2626; }
-
-        /* ===== Hover Chart ===== */
-        .hover-chart {
-            display: none;
-            position: fixed;
-            z-index: 150;
-            background: #fff;
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0,0,0,.15);
-            padding: 12px;
-            width: 280px;
-            height: 180px;
-        }
 
         /* ===== Empty State ===== */
         .empty-state {
@@ -432,26 +473,30 @@
     </div>
 </div>
 
-<!-- Weekly Candlestick Modal -->
+<!-- Candlestick Modal -->
 <div class="modal-overlay" id="candleModal">
     <div class="modal candle-modal">
         <div class="candle-modal-header">
             <div>
-                <h3 id="candle-title">周 K 线</h3>
+                <h3 id="candle-title">K 线</h3>
                 <div class="candle-subtitle" id="candle-subtitle">加载中...</div>
             </div>
             <button class="candle-close" id="candle-close" aria-label="关闭">&times;</button>
         </div>
+        <div class="candle-interval-tabs" role="tablist" aria-label="K线周期">
+            <button class="candle-interval-tab active" type="button" role="tab"
+                    aria-selected="true" data-interval="DAILY">日线</button>
+            <button class="candle-interval-tab" type="button" role="tab"
+                    aria-selected="false" data-interval="WEEKLY">周线</button>
+            <button class="candle-interval-tab" type="button" role="tab"
+                    aria-selected="false" data-interval="MONTHLY">月线</button>
+        </div>
         <div class="candle-chart-wrap">
             <canvas id="candleCanvas"></canvas>
-            <div class="candle-status" id="candle-status">正在加载周 K 数据...</div>
+            <div class="candle-tooltip" id="candleTooltip"></div>
+            <div class="candle-status" id="candle-status">正在加载日 K 数据...</div>
         </div>
     </div>
-</div>
-
-<!-- Hover Chart -->
-<div class="hover-chart" id="hoverChart">
-    <canvas id="hoverChartCanvas"></canvas>
 </div>
 
 <script>
@@ -469,7 +514,6 @@ const dataLoaded = { overview: false, operations: false };
 // ---------- Chart instances ----------
 let pieChartInstance = null;
 let barLineChartInstance = null;
-let hoverChartInstance = null;
 
 // ---------- Helpers ----------
 function fmt(n) {
@@ -481,6 +525,16 @@ function fmtPct(n) {
     return (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%';
 }
 function pnlClass(n) { return n >= 0 ? 'positive' : 'negative'; }
+function escapeHtml(value) {
+    const text = value === null || value === undefined ? '' : String(value);
+    return text.replace(/[&<>"']/g, char => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[char]);
+}
 
 // ---------- Tab switching ----------
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -657,21 +711,25 @@ function renderHoldings() {
     html += '</tr></thead><tbody>';
     holdingsData.forEach(h => {
         const cls = pnlClass(h.profit || 0);
-        const canShowCandles = h.assetType !== 'CASH';
+        const stockId = Number(h.stockId);
+        const validStockId = Number.isSafeInteger(stockId) && stockId > 0;
+        const canShowCandles = h.assetType !== 'CASH' && validStockId;
         html += '<tr' + (canShowCandles
-            ? ' class="candle-row" onclick="openCandles(' + h.stockId + ',\'' + h.symbol + '\',\'' + h.name.replace(/'/g, "\\'") + '\')"'
+            ? ' class="candle-row" data-candle-stock-id="' + stockId + '"'
             : '') + '>';
-        html += '<td><strong>' + h.symbol + '</strong></td>';
-        html += '<td>' + h.name + '</td>';
-        html += '<td>' + (h.assetType || '--') + '</td>';
-        html += '<td>' + h.quantity + '</td>';
+        html += '<td><strong>' + escapeHtml(h.symbol) + '</strong></td>';
+        html += '<td>' + escapeHtml(h.name) + '</td>';
+        html += '<td>' + escapeHtml(h.assetType || '--') + '</td>';
+        html += '<td>' + escapeHtml(h.quantity) + '</td>';
         html += '<td>' + fmt(h.averageCost) + '</td>';
         html += '<td>' + fmt(h.currentPrice) + '</td>';
         html += '<td class="' + cls + '">' + fmt(h.profit) + '</td>';
         html += '<td class="' + cls + '">' + fmtPct(h.profitPercent) + '</td>';
         html += '<td><div class="btn-group">';
-        html += '<button class="btn btn-buy btn-sm" onclick="event.stopPropagation();openTrade(\'' + h.symbol + '\',' + h.stockId + ',\'BUY\')">买入</button>';
-        html += '<button class="btn btn-sell btn-sm" onclick="event.stopPropagation();openTrade(\'' + h.symbol + '\',' + h.stockId + ',\'SELL\')">卖出</button>';
+        html += '<button class="btn btn-buy btn-sm" data-trade-stock-id="' + stockId
+            + '" data-trade-type="BUY">买入</button>';
+        html += '<button class="btn btn-sell btn-sm" data-trade-stock-id="' + stockId
+            + '" data-trade-type="SELL">卖出</button>';
         html += '</div></td>';
         html += '</tr>';
     });
@@ -692,17 +750,20 @@ function renderStocks() {
     stocksData.forEach(s => {
         const chg = s.changePercent || 0;
         const cls = pnlClass(chg);
-        const canShowCandles = s.assetType !== 'CASH';
-        html += '<tr class="stock-row' + (canShowCandles ? ' candle-row' : '') + '" data-stock-id="' + s.id + '"'
-            + (canShowCandles ? ' onclick="openCandles(' + s.id + ',\'' + s.symbol + '\',\'' + s.name.replace(/'/g, "\\'") + '\')"' : '')
-            + '>';
-        html += '<td><strong>' + s.symbol + '</strong></td>';
-        html += '<td>' + s.name + '</td>';
-        html += '<td>' + (s.assetType || '--') + '</td>';
-        html += '<td>' + (s.sector || '--') + '</td>';
+        const stockId = Number(s.id);
+        const validStockId = Number.isSafeInteger(stockId) && stockId > 0;
+        const canShowCandles = s.assetType !== 'CASH' && validStockId;
+        html += '<tr' + (canShowCandles
+            ? ' class="candle-row" data-candle-stock-id="' + stockId + '"'
+            : '') + '>';
+        html += '<td><strong>' + escapeHtml(s.symbol) + '</strong></td>';
+        html += '<td>' + escapeHtml(s.name) + '</td>';
+        html += '<td>' + escapeHtml(s.assetType || '--') + '</td>';
+        html += '<td>' + escapeHtml(s.sector || '--') + '</td>';
         html += '<td>' + fmt(s.currentPrice);
         if (s.priceDate) {
-            html += '<div class="price-meta">截至 ' + s.priceDate + ' · ' + (s.priceSource || '--');
+            html += '<div class="price-meta">截至 ' + escapeHtml(s.priceDate) + ' · '
+                + escapeHtml(s.priceSource || '--');
             if (s.stale) html += ' · <span class="stale-badge">可能过期</span>';
             html += '</div>';
         } else if (s.assetType !== 'CASH') {
@@ -710,124 +771,126 @@ function renderStocks() {
         }
         html += '</td>';
         html += '<td class="' + cls + '">' + fmtPct(chg) + '</td>';
-        html += '<td><button class="btn btn-buy btn-sm"'
+        html += '<td><button class="btn btn-buy btn-sm" data-trade-stock-id="' + stockId
+            + '" data-trade-type="BUY"'
             + (s.currentPrice == null ? ' disabled title="行情未同步"' : '')
-            + ' onclick="event.stopPropagation();openTrade(\'' + s.symbol + '\',' + s.id + ',\'BUY\')">买入</button></td>';
+            + '>买入</button></td>';
         html += '</tr>';
     });
     html += '</tbody></table>';
     el.innerHTML = html;
-    attachHoverEvents();
 }
 
-/* ================================================================
-   Hover Chart – 7-day price
-   ================================================================ */
-let hoverTimeout = null;
-
-function attachHoverEvents() {
-    document.querySelectorAll('.stock-row').forEach(row => {
-        row.addEventListener('mouseenter', function (e) {
-            const stockId = this.dataset.stockId;
-            clearTimeout(hoverTimeout);
-            hoverTimeout = setTimeout(() => showHoverChart(stockId, e), 350);
-        });
-        row.addEventListener('mouseleave', () => {
-            clearTimeout(hoverTimeout);
-            hideHoverChart();
-        });
-    });
+function findOperationStock(stockId) {
+    return (stocksData || []).find(stock => Number(stock.id) === stockId)
+        || (holdingsData || []).find(holding => Number(holding.stockId) === stockId);
 }
 
-async function showHoverChart(stockId, event) {
-    const container = document.getElementById('hoverChart');
-    const rect = event.currentTarget.getBoundingClientRect();
-    container.style.display = 'block';
-    container.style.left = (rect.right + 10) + 'px';
-    container.style.top = rect.top + 'px';
-    // Check if fits on right, else show on left
-    if (rect.right + 300 > window.innerWidth) {
-        container.style.left = (rect.left - 290) + 'px';
+function handleOperationsClick(event) {
+    const container = event.currentTarget;
+    const tradeButton = event.target.closest('button[data-trade-stock-id]');
+    if (tradeButton && container.contains(tradeButton)) {
+        event.stopPropagation();
+        if (tradeButton.disabled) return;
+        const stockId = Number(tradeButton.dataset.tradeStockId);
+        const type = tradeButton.dataset.tradeType;
+        const stock = findOperationStock(stockId);
+        if (stock && (type === 'BUY' || type === 'SELL')) {
+            openTrade(stock.symbol, stockId, type);
+        }
+        return;
     }
-    try {
-        const data = await fetch('/api/stocks/' + stockId + '/prices').then(r => r.json());
-        const ctx = document.getElementById('hoverChartCanvas').getContext('2d');
-        if (hoverChartInstance) hoverChartInstance.destroy();
-        hoverChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.map(d => String(d.date)),
-                datasets: [{
-                    data: data.map(d => d.closePrice),
-                    borderColor: '#3b82f6',
-                    backgroundColor: 'rgba(59,130,246,.08)',
-                    fill: true,
-                    tension: .3,
-                    pointRadius: 3,
-                    borderWidth: 2
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false }, tooltip: { enabled: true } },
-                scales: {
-                    x: { ticks: { font: { size: 10 } } },
-                    y: { ticks: { font: { size: 10 } } }
-                }
-            }
-        });
-    } catch (e) {
-        container.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:20px;">暂无数据</p>';
+
+    const candleRow = event.target.closest('tr[data-candle-stock-id]');
+    if (!candleRow || !container.contains(candleRow)) return;
+    const stockId = Number(candleRow.dataset.candleStockId);
+    const stock = findOperationStock(stockId);
+    if (stock) {
+        openCandles(stockId, stock.symbol, stock.name);
     }
 }
 
-function hideHoverChart() {
-    const container = document.getElementById('hoverChart');
-    container.style.display = 'none';
-    container.innerHTML = '<canvas id="hoverChartCanvas"></canvas>';
-}
+document.getElementById('holdings-content').addEventListener('click', handleOperationsClick);
+document.getElementById('stocks-content').addEventListener('click', handleOperationsClick);
 
 /* ================================================================
-   Weekly Candlestick Modal
+   Candlestick Modal
    ================================================================ */
+const CANDLE_INTERVALS = {
+    DAILY: { label: '日线', limit: 120 },
+    WEEKLY: { label: '周线', limit: 52 },
+    MONTHLY: { label: '月线', limit: 60 }
+};
 let candleAbortController = null;
 let candleSeriesData = null;
+let candleModalStock = null;
+let candleCurrentInterval = 'DAILY';
+let candleChartLayout = null;
 
-async function openCandles(stockId, symbol, name) {
+function openCandles(stockId, symbol, name) {
     if (candleAbortController) candleAbortController.abort();
-    candleAbortController = new AbortController();
+    candleModalStock = { stockId, symbol, name };
+    candleCurrentInterval = 'DAILY';
     candleSeriesData = null;
+    candleChartLayout = null;
 
     document.getElementById('candle-title').textContent = symbol + ' · ' + name;
-    document.getElementById('candle-subtitle').textContent = '周线 · 正在加载';
+    setActiveCandleTab(candleCurrentInterval);
+    hideCandleTooltip();
+    document.getElementById('candleModal').classList.add('show');
+    loadCandleSeries(candleCurrentInterval);
+}
+
+async function loadCandleSeries(interval) {
+    if (!candleModalStock || !CANDLE_INTERVALS[interval]) return;
+    if (candleAbortController) candleAbortController.abort();
+    const controller = new AbortController();
+    candleAbortController = controller;
+    candleCurrentInterval = interval;
+    candleSeriesData = null;
+    candleChartLayout = null;
+    setActiveCandleTab(interval);
+    hideCandleTooltip();
+    clearCandleCanvas();
+
+    const config = CANDLE_INTERVALS[interval];
+    document.getElementById('candle-subtitle').textContent = config.label + ' · 正在加载';
     const status = document.getElementById('candle-status');
     status.className = 'candle-status';
-    status.textContent = '正在加载周 K 数据...';
+    status.textContent = '正在加载' + config.label + ' K 数据...';
     status.style.display = 'flex';
-    document.getElementById('candleModal').classList.add('show');
 
     try {
         const response = await fetch(
-            '/api/stocks/' + stockId + '/candles?interval=WEEKLY&weeks=52',
-            { signal: candleAbortController.signal }
+            '/api/stocks/' + candleModalStock.stockId + '/candles?interval='
+                + interval + '&limit=' + config.limit,
+            { signal: controller.signal }
         );
-        if (!response.ok) throw new Error('周 K 数据请求失败（' + response.status + '）');
+        if (!response.ok) {
+            throw new Error(config.label + ' K 数据请求失败（' + response.status + '）');
+        }
+        if (controller !== candleAbortController) return;
         candleSeriesData = await response.json();
         if (!candleSeriesData.candles || candleSeriesData.candles.length === 0) {
             status.textContent = '暂无历史行情，请先执行行情回填。';
-            document.getElementById('candle-subtitle').textContent = '周线 · 暂无数据';
+            document.getElementById('candle-subtitle').textContent = config.label + ' · 暂无数据';
             return;
         }
         document.getElementById('candle-subtitle').textContent =
-            '周线 · 数据截至 ' + candleSeriesData.asOf + ' · ' + (candleSeriesData.source || '--');
+            config.label + ' · 数据截至 ' + candleSeriesData.asOf + ' · '
+                + (candleSeriesData.source || '--');
         status.style.display = 'none';
         requestAnimationFrame(() => drawCandles(candleSeriesData.candles));
     } catch (error) {
         if (error.name === 'AbortError') return;
+        if (controller !== candleAbortController) return;
         status.className = 'candle-status error';
-        status.textContent = error.message || '周 K 数据加载失败';
-        document.getElementById('candle-subtitle').textContent = '周线 · 加载失败';
+        status.textContent = error.message || config.label + ' K 数据加载失败';
+        document.getElementById('candle-subtitle').textContent = config.label + ' · 加载失败';
+    } finally {
+        if (candleAbortController === controller) {
+            candleAbortController = null;
+        }
     }
 }
 
@@ -837,7 +900,22 @@ function closeCandles() {
         candleAbortController = null;
     }
     candleSeriesData = null;
+    candleModalStock = null;
+    candleChartLayout = null;
+    hideCandleTooltip();
     document.getElementById('candleModal').classList.remove('show');
+    clearCandleCanvas();
+}
+
+function setActiveCandleTab(interval) {
+    document.querySelectorAll('.candle-interval-tab').forEach(button => {
+        const active = button.dataset.interval === interval;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-selected', String(active));
+    });
+}
+
+function clearCandleCanvas() {
     const canvas = document.getElementById('candleCanvas');
     canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
 }
@@ -883,6 +961,7 @@ function drawCandles(candles) {
 
     const step = plotWidth / candles.length;
     const bodyWidth = Math.max(2, Math.min(10, step * 0.62));
+    candleChartLayout = { candles, margin, plotWidth, plotHeight, step, width, height };
     candles.forEach((candle, index) => {
         const x = margin.left + step * (index + 0.5);
         const openY = y(candle.open);
@@ -910,16 +989,99 @@ function drawCandles(candles) {
     candles.forEach((candle, index) => {
         if (index % labelEvery !== 0 && index !== candles.length - 1) return;
         const x = margin.left + step * (index + 0.5);
-        ctx.fillText(String(candle.date).slice(5), x, height - 16);
+        const date = String(candle.date);
+        const label = candleCurrentInterval === 'MONTHLY' ? date.slice(0, 7) : date.slice(5);
+        ctx.fillText(label, x, height - 16);
     });
     ctx.textAlign = 'start';
 }
+
+function showCandleTooltip(candle, event) {
+    const tooltip = document.getElementById('candleTooltip');
+    const wrap = document.querySelector('.candle-chart-wrap');
+    const open = Number(candle.open);
+    const close = Number(candle.close);
+    const change = close - open;
+    const changePercent = open === 0 ? 0 : change / open * 100;
+    const changeClass = change >= 0 ? 'positive' : 'negative';
+    const changeText = (change >= 0 ? '+' : '') + change.toFixed(2)
+        + ' (' + (changePercent >= 0 ? '+' : '') + changePercent.toFixed(2) + '%)';
+    const period = candleCurrentInterval === 'MONTHLY'
+        ? String(candle.date).slice(0, 7)
+        : String(candle.date);
+
+    tooltip.innerHTML =
+        '<div class="candle-tooltip-title">' + CANDLE_INTERVALS[candleCurrentInterval].label
+            + ' · ' + period + '</div>'
+        + '<div class="candle-tooltip-grid">'
+        + '<span>开盘</span><span>' + Number(candle.open).toFixed(2) + '</span>'
+        + '<span>最高</span><span>' + Number(candle.high).toFixed(2) + '</span>'
+        + '<span>最低</span><span>' + Number(candle.low).toFixed(2) + '</span>'
+        + '<span>收盘</span><span>' + Number(candle.close).toFixed(2) + '</span>'
+        + '<span>复权收盘</span><span>' + Number(candle.adjustedClose).toFixed(2) + '</span>'
+        + '<span>涨跌</span><span class="' + changeClass + '">' + changeText + '</span>'
+        + '<span>成交量</span><span>' + Number(candle.volume).toLocaleString('zh-CN') + '</span>'
+        + '</div>';
+    tooltip.style.display = 'block';
+
+    const wrapRect = wrap.getBoundingClientRect();
+    const pointerX = event.clientX - wrapRect.left;
+    const pointerY = event.clientY - wrapRect.top;
+    let left = pointerX + 14;
+    let top = pointerY + 14;
+    if (left + tooltip.offsetWidth > wrap.clientWidth - 8) {
+        left = pointerX - tooltip.offsetWidth - 14;
+    }
+    if (top + tooltip.offsetHeight > wrap.clientHeight - 8) {
+        top = pointerY - tooltip.offsetHeight - 14;
+    }
+    tooltip.style.left = Math.max(8, left) + 'px';
+    tooltip.style.top = Math.max(8, top) + 'px';
+}
+
+function hideCandleTooltip() {
+    const tooltip = document.getElementById('candleTooltip');
+    if (tooltip) tooltip.style.display = 'none';
+}
+
+document.querySelectorAll('.candle-interval-tab').forEach(button => {
+    button.addEventListener('click', () => {
+        const interval = button.dataset.interval;
+        if (interval !== candleCurrentInterval) {
+            loadCandleSeries(interval);
+        }
+    });
+});
+
+document.getElementById('candleCanvas').addEventListener('mousemove', event => {
+    if (!candleChartLayout || !candleChartLayout.candles.length) {
+        hideCandleTooltip();
+        return;
+    }
+    const canvas = event.currentTarget;
+    const rect = canvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) * candleChartLayout.width / rect.width;
+    const y = (event.clientY - rect.top) * candleChartLayout.height / rect.height;
+    const { margin, plotWidth, plotHeight, step, candles } = candleChartLayout;
+    if (x < margin.left || x > margin.left + plotWidth
+            || y < margin.top || y > margin.top + plotHeight) {
+        hideCandleTooltip();
+        return;
+    }
+    const index = Math.min(
+        candles.length - 1,
+        Math.max(0, Math.floor((x - margin.left) / step))
+    );
+    showCandleTooltip(candles[index], event);
+});
+document.getElementById('candleCanvas').addEventListener('mouseleave', hideCandleTooltip);
 
 document.getElementById('candle-close').addEventListener('click', closeCandles);
 document.getElementById('candleModal').addEventListener('click', event => {
     if (event.target === event.currentTarget) closeCandles();
 });
 window.addEventListener('resize', () => {
+    hideCandleTooltip();
     if (candleSeriesData && document.getElementById('candleModal').classList.contains('show')) {
         drawCandles(candleSeriesData.candles);
     }

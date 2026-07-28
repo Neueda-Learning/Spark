@@ -1,6 +1,5 @@
 package com.portfolio.service;
 
-import com.portfolio.dto.PriceHistoryResponse;
 import com.portfolio.model.MarketPriceDaily;
 import com.portfolio.model.Stock;
 import com.portfolio.repository.MarketPriceRepository;
@@ -14,8 +13,6 @@ import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -64,28 +61,6 @@ public class DatabasePriceService implements PriceService {
                 .subtract(recent.get(1).closePrice())
                 .multiply(BigDecimal.valueOf(100))
                 .divide(recent.get(1).closePrice(), 2, RoundingMode.HALF_UP);
-    }
-
-    @Override
-    public List<PriceHistoryResponse> getSevenDayPriceHistory(String symbol) {
-        Stock stock = findStock(symbol);
-        if (isCash(stock)) {
-            return List.of();
-        }
-        List<MarketPriceDaily> recent = new ArrayList<>(
-                marketPriceRepository.findRecentByStockId(stock.id(), 7)
-        );
-        Collections.reverse(recent);
-        return recent.stream()
-                .map(price -> new PriceHistoryResponse(
-                        price.tradeDate(),
-                        price.openPrice(),
-                        price.closePrice(),
-                        price.highPrice(),
-                        price.lowPrice(),
-                        price.volume()
-                ))
-                .toList();
     }
 
     @Override

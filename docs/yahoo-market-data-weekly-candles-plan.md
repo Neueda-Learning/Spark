@@ -1,12 +1,13 @@
-# Yahoo 金融数据入库与周 K 线功能改动方案
+# Yahoo 金融数据入库与多周期 K 线功能改动方案
 
 ## 1. 文档信息
 
 - 项目：Portfolio Manager
-- 文档状态：方案评审稿
+- 文档状态：已实施，持续增强
 - 适用版本：V1 后续增量版本
 - 编写日期：2026-07-27
-- 本文档只描述设计与改动范围，不包含代码实现
+- 最近更新：2026-07-28
+- 本文档描述设计、已实施范围和后续增强决策
 
 ## 2. 背景
 
@@ -17,7 +18,6 @@
 - 默认投资组合、持仓和买卖交易；
 - 组合总览、资产分配和投资操作页面；
 - 基于 `SimulatedPriceService` 的确定性模拟行情；
-- 鼠标悬停显示模拟的七日价格折线图。
 
 当前行情存在以下限制：
 
@@ -27,7 +27,7 @@
 - 无法形成可靠的日线、周线等历史行情；
 - `YahooFinanceAPI` 依赖已经存在，但尚未在业务代码中使用。
 
-本次增量希望在保留 V1 组合与交易能力的基础上，引入 Yahoo Finance 历史行情，并在投资操作页面中展示股票周 K 线。
+本次增量希望在保留 V1 组合与交易能力的基础上，引入 Yahoo Finance 历史行情，并在投资操作页面中展示日、周、月三个周期的股票 K 线。
 
 ## 3. 建设目标
 
@@ -38,9 +38,10 @@
 3. 在应用首次接入时回填一段历史日线数据。
 4. 在美股盘后定期同步最新日行情。
 5. 组合估值、持仓盈亏和交易参考价从数据库最新收盘价读取。
-6. 提供按股票查询周 K 线的 REST API。
-7. 用户点击投资操作页面中的某只股票时，弹出该股票的周 K 线。
-8. Yahoo 暂时不可用时，已有历史行情和页面仍然可访问。
+6. 提供按股票查询日、周、月 K 线的统一 REST API。
+7. 用户点击投资操作页面中的某只股票时，弹出 K 线图，默认显示日线并支持周期切换。
+8. 鼠标悬浮在某根 K 线上时显示该周期的 OHLC、复权收盘价、涨跌幅和成交量。
+9. Yahoo 暂时不可用时，已有历史行情和页面仍然可访问。
 
 ### 3.2 非目标
 
@@ -70,9 +71,9 @@ Yahoo Finance 只由后台同步任务调用。Controller、组合估值、交�
 - 保证组合总览、持仓列表和 K 线使用同一份价格；
 - 便于测试和后续替换行情提供商。
 
-### 4.2 只持久化日线，周线按需派生
+### 4.2 只持久化日线，多周期 K 线按需派生
 
-数据库保存每日 OHLCV。周 K 线由日线聚合，不单独持久化。
+数据库只保存每日 OHLCV。日 K 线直接映射日行情；周 K 和月 K 均由日线动态聚合，不单独持久化。
 
 周线聚合规则：
 
@@ -83,6 +84,8 @@ Yahoo Finance 只由后台同步任务调用。Controller、组合估值、交�
 - `adjustedClose`：该周最后一个交易日的复权收盘价；
 - `volume`：该周成交量之和；
 - `date`：该周周一，或统一定义为该周第一个交易日。
+
+月线使用相同的 OHLCV 规则，按自然月分组，`date` 统一返回该月第一天。当前未结束的周和月允许展示，并通过响应顶层 `asOf` 标明数据截止日期。
 
 ### 4.3 Yahoo 调用必须通过可替换适配器
 
@@ -428,23 +431,29 @@ API 中需要区分两种不同时间语义：
 
 交易页面应明确说明当前成交计算使用“最新可用盘后收盘价”，不是实时市场成交价。
 
-## 8. 周 K 线 API
+## 8. 多周期 K 线 API
 
-### 8.1 新接口
+### 8.1 统一接口
 
-建议新增：
-
-```http
-GET /api/stocks/{id}/candles?interval=WEEKLY&weeks=52
-```
-
-暂时保留现有：
+接口支持日、周、月三个周期：
 
 ```http
-GET /api/stocks/{id}/prices
+GET /api/stocks/{id}/candles?interval=DAILY&limit=120
+GET /api/stocks/{id}/candles?interval=WEEKLY&limit=52
+GET /api/stocks/{id}/candles?interval=MONTHLY&limit=60
 ```
 
-避免直接破坏 V1 的悬停折线图。新 K 线功能稳定后，再决定是否删除旧交互。
+`interval` 省略时默认 `DAILY`。`limit` 省略时按周期使用默认值：
+
+| interval | 默认根数 | 最大根数 |
+|---|---:|---:|
+| `DAILY` | 120 | 260 |
+| `WEEKLY` | 52 | 104 |
+| `MONTHLY` | 60 | 120 |
+
+接口只读取数据库，不在用户请求过程中访问 Yahoo。
+
+旧的鼠标悬停七日折线图及其 `GET /api/stocks/{id}/prices` 接口不再保留。
 
 ### 8.2 响应示例
 
@@ -452,12 +461,12 @@ GET /api/stocks/{id}/prices
 {
   "stockId": 1,
   "symbol": "AAPL",
-  "interval": "WEEKLY",
+  "interval": "DAILY",
   "source": "YAHOO",
   "asOf": "2026-07-24",
   "candles": [
     {
-      "date": "2026-07-20",
+      "date": "2026-07-24",
       "open": 210.10,
       "high": 218.20,
       "low": 208.40,
@@ -475,6 +484,7 @@ GET /api/stocks/{id}/prices
 
 - `dto/CandleResponse.java`
 - `dto/CandleSeriesResponse.java`
+- `service/CandleInterval.java`
 - `service/CandleService.java`
 - `service/CandleServiceImpl.java`
 
@@ -482,7 +492,7 @@ GET /api/stocks/{id}/prices
 
 - `controller/StockController.java`
 
-### 8.4 周线聚合位置
+### 8.4 多周期转换位置
 
 推荐在 Java Service 中聚合，而不是在 MySQL 中通过复杂 SQL 计算。
 
@@ -492,9 +502,15 @@ GET /api/stocks/{id}/prices
 - 更容易处理节假日；
 - 更容易处理不完整交易周；
 - 聚合逻辑可以通过纯单元测试验证；
-- 后续增加 MONTHLY 时可以复用。
+- 日、周、月可以共用统一的累加器和返回模型。
 
-第一版可包含当前未结束周，并通过顶层 `asOf` 告知数据截至日期。
+转换规则：
+
+- `DAILY`：每日行情直接映射为 `CandleResponse`；
+- `WEEKLY`：按周一作为周期键聚合；
+- `MONTHLY`：按自然月第一天作为周期键聚合；
+- 结果统一按日期升序返回，并裁剪到最近 `limit` 根；
+- 当前未结束周和月可以返回，通过顶层 `asOf` 告知数据截至日期。
 
 ## 9. 前端设计
 
@@ -516,12 +532,13 @@ GET /api/stocks/{id}/prices
 点击股票行后：
 
 1. 打开 K 线弹窗或右侧抽屉；
-2. 显示股票代码、名称、“周线”和数据截至日期；
-3. 显示 loading；
-4. 请求 candles API；
-5. 绘制 K 线；
-6. 支持关闭和切换股票；
-7. 请求失败时在弹窗内显示错误，不影响页面其他功能。
+2. 显示股票代码、名称、当前周期和数据截至日期；
+3. 顶部显示“日线｜周线｜月线”Tab，默认选中日线；
+4. 显示 loading 并请求对应周期的 candles API；
+5. 使用 Canvas 绘制 K 线；
+6. 鼠标悬浮在 K 线上显示该周期详细 Tooltip；
+7. 支持关闭、切换股票和切换周期；
+8. 请求失败时在弹窗内显示错误，不影响页面其他功能。
 
 交易按钮必须阻止事件冒泡：
 
@@ -531,40 +548,42 @@ Buy/Sell button click -> stopPropagation
 
 否则点击买卖按钮时会同时打开 K 线。
 
-### 9.3 图表库
+### 9.3 图表实现
 
-推荐使用 TradingView Lightweight Charts 的 Candlestick Series。
+当前实现使用原生 Canvas 绘制 K 线，不增加第三方 K 线库或 CDN 依赖。
 
-原因：
-
-- 原生支持金融 K 线；
-- 支持十字线、缩放和时间轴；
-- 数据格式直接对应 open/high/low/close；
-- 比在普通 Chart.js 上自行实现 K 线更简单。
-
-当前前端没有 npm 构建链，建议固定版本并将 JS 文件放入：
-
-- `src/main/resources/static/vendor/`
-
-相比运行时从 CDN 加载，本地静态文件更适合结课演示，避免现场网络不稳定。具体许可证声明应随 vendor 文件保留。
+周期切换沿用同一套 Canvas 绘制逻辑。Tooltip 使用 Canvas 横坐标命中对应 K 线，并通过图表容器内的绝对定位 DOM 展示详细数据。这样既能保持绘制性能，也便于控制 Tooltip 的内容和边界。
 
 ### 9.4 前端状态
 
 建议增加：
 
 - 当前选中股票；
+- 当前周期，打开弹窗时重置为 `DAILY`；
 - K 线数据；
 - loading；
 - error；
-- 当前图表实例；
+- 当前 Canvas 布局信息，用于鼠标命中；
 - 当前请求控制器。
 
-切换股票或关闭弹窗时应：
+切换股票、切换周期或关闭弹窗时应：
 
 - 取消未完成请求；
-- 销毁旧图表实例；
+- 清空旧图表和 Tooltip；
 - 清空旧错误；
-- 防止较慢的旧请求覆盖新股票数据。
+- 防止较慢的旧请求覆盖新股票或新周期数据。
+
+### 9.5 Tooltip
+
+Tooltip 展示：
+
+- 日期或周期；
+- 开盘、最高、最低、收盘；
+- 复权收盘价；
+- 相对开盘价的涨跌额和涨跌幅；
+- 成交量。
+
+鼠标离开绘图区、切换周期、调整窗口大小或关闭弹窗时隐藏 Tooltip。Tooltip 在图表边缘应自动换向，避免超出弹窗。
 
 ## 10. 错误处理与降级
 
@@ -631,8 +650,9 @@ Buy/Sell button click -> stopPropagation
 - 单只股票失败不影响其他股票；
 - 无效数据不会入库。
 
-### 11.3 周线聚合测试
+### 11.3 多周期 K 线测试
 
+- 日行情直接映射且结果按日期升序；
 - 正常五个交易日；
 - 周一休市；
 - 周五休市；
@@ -640,14 +660,18 @@ Buy/Sell button click -> stopPropagation
 - 跨年周；
 - 当前不完整周；
 - 周成交量求和；
+- 跨月数据正确分组；
+- 月线开高低收和成交量计算正确；
+- 当前不完整月；
 - 结果按日期升序。
 
 ### 11.4 Controller 测试
 
-- 正常返回 52 周 K 线；
+- 不传 interval 时默认返回 120 根日 K；
+- 正常返回周 K 和月 K；
 - 股票不存在；
 - interval 不支持；
-- weeks 越界；
+- 各周期 limit 越界；
 - 无历史数据；
 - Service 异常的错误响应。
 
@@ -668,6 +692,11 @@ Buy/Sell button click -> stopPropagation
 - 点击持仓行打开正确股票；
 - 点击市场标的行打开正确股票；
 - 点击买卖按钮不会打开 K 线；
+- 打开弹窗默认选中日线；
+- 日线、周线、月线 Tab 可正常切换；
+- 快速切换周期不会展示旧请求数据；
+- 鼠标悬浮 K 线时 Tooltip 数据与接口一致；
+- Tooltip 在图表边缘不会溢出；
 - 快速切换股票不会展示错乱数据；
 - 空数据、请求失败和加载状态正确；
 - 图表在不同窗口宽度下正常；
@@ -698,13 +727,13 @@ Buy/Sell button click -> stopPropagation
 - `src/main/java/com/portfolio/service/MarketDataSyncService.java`
 - `src/main/java/com/portfolio/service/MarketDataSyncServiceImpl.java`
 - `src/main/java/com/portfolio/service/DatabasePriceService.java`
+- `src/main/java/com/portfolio/service/CandleInterval.java`
 - `src/main/java/com/portfolio/service/CandleService.java`
 - `src/main/java/com/portfolio/service/CandleServiceImpl.java`
 - `src/main/java/com/portfolio/scheduler/MarketDataScheduler.java`
 - `src/main/java/com/portfolio/dto/CandleResponse.java`
 - `src/main/java/com/portfolio/dto/CandleSeriesResponse.java`
 - 对应的测试文件
-- 固定版本的前端 K 线库静态文件及许可证文件
 
 ## 13. 分阶段实施计划
 
@@ -735,22 +764,22 @@ Buy/Sell button click -> stopPropagation
 
 交付结果：V1 原有功能使用同一份真实盘后价格。
 
-### 阶段 3：周 K 线 API
+### 阶段 3：多周期 K 线 API
 
-- 实现周聚合；
+- 实现日线映射、周聚合和月聚合；
 - 实现 candles API；
 - 完成聚合和 Controller 测试。
 
-交付结果：接口可返回最近 52 周 K 线。
+交付结果：接口可统一返回日、周、月 K 线，并支持周期独立默认值和上限。
 
-### 阶段 4：前端 K 线交互
+### 阶段 4：前端多周期 K 线交互
 
-- 引入固定版本 Lightweight Charts；
-- 增加弹窗或抽屉；
+- 使用原生 Canvas 绘制 K 线；
+- 增加弹窗、周期 Tab 和 Tooltip；
 - 股票行绑定点击；
-- 处理按钮冒泡、加载、错误、切换和销毁。
+- 处理按钮冒泡、加载、错误、股票切换、周期切换和请求取消。
 
-交付结果：投资操作页面点击股票可以查看周 K 线。
+交付结果：投资操作页面点击股票默认查看日 K，可切换周 K、月 K，并可悬浮查看详细数据。
 
 ### 阶段 5：定时任务与文档
 
@@ -783,7 +812,9 @@ Buy/Sell button click -> stopPropagation
 
 ### 14.2 API 验收
 
-- candles API 返回指定股票最近 52 周数据；
+- candles API 默认返回指定股票最近 120 根日线；
+- interval 可切换 DAILY、WEEKLY、MONTHLY；
+- limit 使用周期默认值并执行上限校验；
 - 每根 K 线满足 OHLC 聚合规则；
 - 日期按升序返回；
 - 股票不存在、无数据和非法参数有明确响应；
@@ -791,7 +822,9 @@ Buy/Sell button click -> stopPropagation
 
 ### 14.3 前端验收
 
-- 点击股票行可打开正确周 K 线；
+- 点击股票行可打开正确 K 线且默认显示日线；
+- 日线、周线和月线 Tab 切换正常；
+- 悬浮任意 K 线可显示对应周期详细 Tooltip；
 - 买入和卖出按钮行为不受影响；
 - 数据截至日期可见；
 - 请求失败时页面不会崩溃；
@@ -817,27 +850,25 @@ Buy/Sell button click -> stopPropagation
 | 时区转换错误 | 日期错位、周线错误 | 固定使用 `America/New_York` |
 | 修改全局时区影响 V1 | 交易和创建时间语义变化 | 纽约时区只局部用于 scheduler、Clock 和行情日期，禁止修改全局时区 |
 | 模拟和真实数据混用 | 用户误解 | 禁止静默回退，响应携带 source/asOf/stale |
-| 演示现场 CDN 不可用 | K 线无法加载 | 图表库固定版本并保存到本地 static/vendor |
+| Canvas 命中坐标在缩放后偏移 | Tooltip 对应错误 K 线 | 保存逻辑绘图区尺寸，并按实际 Canvas 缩放比例换算鼠标坐标 |
 | 多实例重复执行 | 重复请求 Yahoo | V1 依靠数据库 upsert；多实例阶段再增加分布式锁 |
 
 ## 16. 待确认决策
 
 实施前需要团队确认：
 
-1. 周 K 默认展示最近 52 周还是 104 周；
-2. 当前未结束周是否显示；
-3. 行情过期时只警告还是禁止买卖；
-4. 旧的鼠标悬停七日折线图是否继续保留；
-5. K 线使用原始 OHLC 还是复权后的 OHLC；
-6. 首次历史回填由启动时自动触发，还是通过显式命令执行；
-7. 是否在本阶段引入 Testcontainers MySQL。
+1. 当前未结束周和月是否显示；
+2. 行情过期时只警告还是禁止买卖；
+3. K 线使用原始 OHLC 还是复权后的 OHLC；
+4. 首次历史回填由启动时自动触发，还是通过显式命令执行；
+5. 是否在本阶段引入 Testcontainers MySQL。
 
 建议的第一版选择：
 
-- 默认 52 周；
-- 显示当前不完整周，并显示 `asOf`；
+- 默认显示最近 120 根日线；周线默认 52 根，月线默认 60 根；
+- 显示当前不完整周和月，并显示 `asOf`；
 - 行情过期只警告，不阻断交易；
-- 暂时保留旧悬停图；
+- 删除旧悬停图及其七日价格接口；
 - 展示原始 OHLC，同时保存 adjusted close；
 - 通过显式配置触发首次回填；
 - 时间允许则引入 Testcontainers，否则完成一次开发库端到端验证。
@@ -849,5 +880,3 @@ Buy/Sell button click -> stopPropagation
 - Yahoo 接口变化相关 Issue：<https://github.com/sstrickx/yahoofinance-api/issues/209>
 - NYSE 交易时间和休市日历：<https://www.nyse.com/trade/hours-calendars>
 - Spring Scheduling：<https://docs.spring.io/spring-framework/reference/integration/scheduling.html>
-- Lightweight Charts：<https://tradingview.github.io/lightweight-charts/>
-- Candlestick Series：<https://tradingview.github.io/lightweight-charts/docs/series-types>
