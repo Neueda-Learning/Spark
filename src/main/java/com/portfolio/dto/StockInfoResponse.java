@@ -13,5 +13,6 @@ public record StockInfoResponse(
         String sector,
         String exchange,
         BigDecimal currentPrice,
-        BigDecimal changePercent
+        BigDecimal changePercent,
+        BigDecimal dividendYield
 ) {}

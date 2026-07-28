@@ -12,6 +12,7 @@ public record PortfolioOverviewResponse(
         BigDecimal totalProfit,
         BigDecimal returnRate,
         BigDecimal cashBalance,
+        BigDecimal totalAnnualDividend,
         List<AssetAllocation> allocation
 ) {
     public record AssetAllocation(

@@ -1,13 +1,15 @@
 -- Portfolio Manager Database Schema
 
 CREATE TABLE IF NOT EXISTS stock (
-    id          BIGINT         AUTO_INCREMENT PRIMARY KEY,
-    symbol      VARCHAR(10)    NOT NULL UNIQUE,
-    name        VARCHAR(200)   NOT NULL,
-    asset_type  VARCHAR(20)    NOT NULL,
-    sector      VARCHAR(50),
-    exchange    VARCHAR(20)    NOT NULL,
-    currency    VARCHAR(3)     NOT NULL DEFAULT 'USD'
+    id              BIGINT         AUTO_INCREMENT PRIMARY KEY,
+    symbol          VARCHAR(10)    NOT NULL UNIQUE,
+    name            VARCHAR(200)   NOT NULL,
+    asset_type      VARCHAR(20)    NOT NULL,
+    sector          VARCHAR(50),
+    exchange        VARCHAR(20)    NOT NULL,
+    currency        VARCHAR(3)     NOT NULL DEFAULT 'USD',
+    dividend_yield  DECIMAL(6,4)   NOT NULL DEFAULT 0.0000,
+    dividend_date   DATE
 );
 
 CREATE TABLE IF NOT EXISTS portfolio (
