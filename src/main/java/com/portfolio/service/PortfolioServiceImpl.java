@@ -3,23 +3,29 @@ package com.portfolio.service;
 import com.portfolio.dto.*;
 import com.portfolio.model.Holding;
 import com.portfolio.model.Portfolio;
-import com.portfolio.model.PortfolioSnapshot;
+import com.portfolio.model.PortfolioPerformanceCache;
 import com.portfolio.model.Stock;
 import com.portfolio.repository.HoldingRepository;
+import com.portfolio.repository.MarketPriceDailyRepository;
 import com.portfolio.repository.PortfolioRepository;
-import com.portfolio.repository.PortfolioSnapshotRepository;
+import com.portfolio.repository.PortfolioPerformanceCacheRepository;
 import com.portfolio.repository.StockRepository;
+import com.portfolio.repository.TransactionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class PortfolioServiceImpl implements PortfolioService {
+
+        private static final int PERFORMANCE_WINDOW_DAYS = 7;
+        private static final BigDecimal HUNDRED = BigDecimal.valueOf(100);
 
     private static final Logger log = LoggerFactory.getLogger(PortfolioServiceImpl.class);
 
@@ -32,18 +38,24 @@ public class PortfolioServiceImpl implements PortfolioService {
     private final PortfolioRepository portfolioRepository;
     private final HoldingRepository holdingRepository;
     private final StockRepository stockRepository;
-    private final PortfolioSnapshotRepository snapshotRepository;
+        private final PortfolioPerformanceCacheRepository performanceCacheRepository;
+        private final TransactionRepository transactionRepository;
+        private final MarketPriceDailyRepository marketPriceDailyRepository;
     private final PriceService priceService;
 
     public PortfolioServiceImpl(PortfolioRepository portfolioRepository,
                                 HoldingRepository holdingRepository,
                                 StockRepository stockRepository,
-                                PortfolioSnapshotRepository snapshotRepository,
+                                                                PortfolioPerformanceCacheRepository performanceCacheRepository,
+                                                                TransactionRepository transactionRepository,
+                                                                MarketPriceDailyRepository marketPriceDailyRepository,
                                 PriceService priceService) {
         this.portfolioRepository = portfolioRepository;
         this.holdingRepository = holdingRepository;
         this.stockRepository = stockRepository;
-        this.snapshotRepository = snapshotRepository;
+                this.performanceCacheRepository = performanceCacheRepository;
+                this.transactionRepository = transactionRepository;
+                this.marketPriceDailyRepository = marketPriceDailyRepository;
         this.priceService = priceService;
     }
 
@@ -162,43 +174,122 @@ public class PortfolioServiceImpl implements PortfolioService {
 
     @Override
     public List<WeeklyPerformanceResponse> getWeeklyPerformance(Long portfolioId) {
-        List<PortfolioSnapshot> snapshots = snapshotRepository.findByPortfolioIdOrderBySnapshotDateDesc(portfolioId, 7);
-
-        if (snapshots.isEmpty()) {
-            // No snapshots yet — generate based on current state
-            // Return empty list; frontend should handle this gracefully
+                List<LocalDate> tradeDates = marketPriceDailyRepository.findLatestTradeDates(PERFORMANCE_WINDOW_DAYS);
+                if (tradeDates.isEmpty()) {
             return List.of();
         }
 
-        // Reverse to chronological order
-        List<PortfolioSnapshot> ordered = new ArrayList<>(snapshots);
-        Collections.reverse(ordered);
+                List<LocalDate> orderedDates = new ArrayList<>(tradeDates);
+                Collections.reverse(orderedDates);
 
-        BigDecimal initialCost = ordered.getFirst().investedCost();
-        List<WeeklyPerformanceResponse> result = new ArrayList<>();
+                List<PortfolioPerformanceCache> cached = performanceCacheRepository
+                                .findByPortfolioIdAndPerformanceDates(portfolioId, orderedDates);
+                LocalDateTime latestMarketRefresh = marketPriceDailyRepository.findLatestFetchedAtForTradeDates(orderedDates);
 
-        for (int i = 0; i < ordered.size(); i++) {
-            PortfolioSnapshot snap = ordered.get(i);
-            BigDecimal dailyProfit;
-            if (i == 0) {
-                dailyProfit = BigDecimal.ZERO;
-            } else {
-                dailyProfit = snap.totalValue().subtract(ordered.get(i - 1).totalValue());
-            }
-            BigDecimal returnRate = initialCost.compareTo(BigDecimal.ZERO) > 0
-                    ? snap.totalValue().subtract(initialCost)
-                            .multiply(BigDecimal.valueOf(100))
-                            .divide(initialCost, 2, RoundingMode.HALF_UP)
-                    : BigDecimal.ZERO;
+                boolean cacheComplete = cached.size() == orderedDates.size();
+                boolean cacheFresh = latestMarketRefresh == null
+                                || cached.stream().allMatch(entry -> !entry.refreshedAt().isBefore(latestMarketRefresh));
 
-            result.add(new WeeklyPerformanceResponse(
-                    snap.snapshotDate(),
-                    snap.totalValue(),
-                    dailyProfit.setScale(2, RoundingMode.HALF_UP),
-                    returnRate
-            ));
+                List<PortfolioPerformanceCache> effectiveCache = cached;
+                if (!cacheComplete || !cacheFresh) {
+                        effectiveCache = rebuildPerformanceCache(portfolioId, orderedDates);
+                        performanceCacheRepository.replaceForPortfolio(portfolioId, effectiveCache);
         }
 
-        return result;
+                return effectiveCache.stream()
+                                .map(entry -> new WeeklyPerformanceResponse(
+                                                entry.performanceDate(),
+                                                entry.totalValue(),
+                                                entry.cumulativeProfit(),
+                                                entry.returnRate()
+                                ))
+                                .toList();
     }
+
+        private List<PortfolioPerformanceCache> rebuildPerformanceCache(Long portfolioId, List<LocalDate> orderedDates) {
+                List<com.portfolio.model.Transaction> transactions = new ArrayList<>(transactionRepository.findByPortfolioId(portfolioId));
+                transactions.sort(Comparator.comparing(com.portfolio.model.Transaction::createdAt));
+
+                Map<Long, PositionState> positions = new HashMap<>();
+                int transactionIndex = 0;
+                LocalDateTime refreshedAt = LocalDateTime.now();
+                List<PortfolioPerformanceCache> entries = new ArrayList<>();
+
+                for (LocalDate tradeDate : orderedDates) {
+                        while (transactionIndex < transactions.size()
+                                        && !transactions.get(transactionIndex).createdAt().toLocalDate().isAfter(tradeDate)) {
+                                applyTransaction(positions, transactions.get(transactionIndex));
+                                transactionIndex++;
+                        }
+
+                        BigDecimal investedCost = BigDecimal.ZERO;
+                        BigDecimal cumulativeProfit = BigDecimal.ZERO;
+                        Map<Long, BigDecimal> closePrices = marketPriceDailyRepository.findClosePricesByTradeDate(tradeDate, positions.keySet());
+
+                        for (Map.Entry<Long, PositionState> entry : positions.entrySet()) {
+                                PositionState state = entry.getValue();
+                                if (state.quantity.compareTo(BigDecimal.ZERO) <= 0) {
+                                        continue;
+                                }
+
+                                BigDecimal cost = state.averageCost.multiply(state.quantity).setScale(2, RoundingMode.HALF_UP);
+                                investedCost = investedCost.add(cost);
+
+                                BigDecimal closePrice = closePrices.get(entry.getKey());
+                                if (closePrice == null) {
+                                        log.warn("Missing close price for stock {} on {} when rebuilding weekly performance cache", entry.getKey(), tradeDate);
+                                        continue;
+                                }
+
+                                BigDecimal profit = closePrice.subtract(state.averageCost)
+                                                .multiply(state.quantity)
+                                                .setScale(2, RoundingMode.HALF_UP);
+                                cumulativeProfit = cumulativeProfit.add(profit);
+                        }
+
+                        BigDecimal returnRate = investedCost.compareTo(BigDecimal.ZERO) > 0
+                                        ? cumulativeProfit.multiply(HUNDRED).divide(investedCost, 2, RoundingMode.HALF_UP)
+                                        : BigDecimal.ZERO;
+                        BigDecimal totalValue = investedCost.add(cumulativeProfit).setScale(2, RoundingMode.HALF_UP);
+
+                        entries.add(new PortfolioPerformanceCache(
+                                        null,
+                                        portfolioId,
+                                        tradeDate,
+                                        investedCost.setScale(2, RoundingMode.HALF_UP),
+                                        cumulativeProfit.setScale(2, RoundingMode.HALF_UP),
+                                        returnRate,
+                                        totalValue,
+                                        refreshedAt
+                        ));
+                }
+
+                return entries;
+        }
+
+        private void applyTransaction(Map<Long, PositionState> positions, com.portfolio.model.Transaction transaction) {
+                PositionState current = positions.getOrDefault(transaction.stockId(), new PositionState(BigDecimal.ZERO, BigDecimal.ZERO));
+
+                if ("BUY".equals(transaction.type())) {
+                        BigDecimal newQuantity = current.quantity.add(transaction.quantity());
+                        BigDecimal existingCost = current.averageCost.multiply(current.quantity);
+                        BigDecimal combinedCost = existingCost.add(transaction.unitPrice().multiply(transaction.quantity()));
+                        BigDecimal newAverageCost = newQuantity.compareTo(BigDecimal.ZERO) > 0
+                                        ? combinedCost.divide(newQuantity, 4, RoundingMode.HALF_UP)
+                                        : BigDecimal.ZERO;
+                        positions.put(transaction.stockId(), new PositionState(newQuantity, newAverageCost));
+                        return;
+                }
+
+                BigDecimal remainingQuantity = current.quantity.subtract(transaction.quantity());
+                if (remainingQuantity.compareTo(BigDecimal.ZERO) <= 0) {
+                        positions.remove(transaction.stockId());
+                        return;
+                }
+
+                positions.put(transaction.stockId(), new PositionState(remainingQuantity, current.averageCost));
+        }
+
+        private record PositionState(BigDecimal quantity, BigDecimal averageCost) {
+        }
 }
