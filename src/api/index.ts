@@ -1,7 +1,6 @@
 import axios from 'axios';
 import {
   StockInfoResponse,
-  PriceHistoryResponse,
   PortfolioOverviewResponse,
   WeeklyPerformanceResponse,
   HoldingResponse,
@@ -17,8 +16,6 @@ export const stockApi = {
   getAll: () => api.get<StockInfoResponse[]>('/stocks').then((r) => r.data),
   getById: (id: number) =>
     api.get<StockInfoResponse>(`/stocks/${id}`).then((r) => r.data),
-  getPriceHistory: (id: number) =>
-    api.get<PriceHistoryResponse>(`/stocks/${id}/prices`).then((r) => r.data),
 };
 
 export const portfolioApi = {

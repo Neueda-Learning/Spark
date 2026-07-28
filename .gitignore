@@ -8,6 +8,7 @@ target/
 .settings/
 *.iws
 *.ipr
+*.swp
 
 
 .DS_Store
