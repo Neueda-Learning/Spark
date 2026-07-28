@@ -30,7 +30,7 @@ public class AiAssistantServiceImpl implements AiAssistantService {
     private static final String CHART_MARKER = "<<AI_CHARTS_JSON>>";
     private static final BigDecimal ZERO_MONEY = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
-    private static final Pattern SYMBOL_PATTERN = Pattern.compile("\\b[A-Z]{1,6}\\b");
+    private static final Pattern SYMBOL_PATTERN = Pattern.compile("\\b[A-Z]{1,6}(?:\\.[A-Z]{1,3})?\\b");
 
             private static final Set<String> MARKET_INTENT_KEYWORDS = Set.of(
                 "推荐", "调仓", "配置", "买", "卖", "加仓", "减仓", "建仓", "选股", "机会", "市场", "行情", "分析", "股票", "投资", "股价",
