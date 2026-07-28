@@ -17,6 +17,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
+import static java.math.BigDecimal.*;
+
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -33,14 +35,15 @@ class StockControllerTest {
     @MockBean
     private PriceService priceService;
 
-    private final Stock aapl = new Stock(1L, "AAPL", "Apple Inc.", "STOCK", "Technology", "NASDAQ", "USD");
+    private final Stock aapl = new Stock(1L, "AAPL", "Apple Inc.", "STOCK", "Technology", "NASDAQ", "USD",
+            new BigDecimal("0.0050"), LocalDate.of(2026, 5, 10));
 
     @Test
     @DisplayName("GET /api/stocks returns 200 and a JSON array with prices")
     void getAll_returns200() throws Exception {
         StockInfoResponse response = new StockInfoResponse(
                 1L, "AAPL", "Apple Inc.", "STOCK", "Technology", "NASDAQ",
-                new BigDecimal("195.50"), new BigDecimal("1.25"));
+                new BigDecimal("195.50"), new BigDecimal("1.25"), new BigDecimal("0.0050"));
         when(stockService.getAllStocksWithPrice()).thenReturn(List.of(response));
 
         mockMvc.perform(get("/api/stocks"))

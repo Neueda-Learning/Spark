@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -52,7 +53,8 @@ class TransactionServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        aapl = new Stock(1L, "AAPL", "Apple Inc.", "STOCK", "Technology", "NASDAQ", "USD");
+        aapl = new Stock(1L, "AAPL", "Apple Inc.", "STOCK", "Technology", "NASDAQ", "USD",
+                new BigDecimal("0.0050"), LocalDate.of(2026, 5, 10));
         portfolio = new Portfolio(1L, "My Portfolio", new BigDecimal("100000.00"), LocalDateTime.now());
     }
 
