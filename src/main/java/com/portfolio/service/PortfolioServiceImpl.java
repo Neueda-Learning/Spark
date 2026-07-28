@@ -173,6 +173,7 @@ public class PortfolioServiceImpl implements PortfolioService {
     }
 
     @Override
+    @org.springframework.transaction.annotation.Transactional
     public List<WeeklyPerformanceResponse> getWeeklyPerformance(Long portfolioId) {
                 List<LocalDate> tradeDates = marketPriceDailyRepository.findLatestTradeDates(PERFORMANCE_WINDOW_DAYS);
                 if (tradeDates.isEmpty()) {
