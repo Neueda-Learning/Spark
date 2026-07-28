@@ -1022,16 +1022,20 @@ function showCandleTooltip(candle, event) {
         : String(candle.date);
 
     tooltip.innerHTML =
-        '<div class="candle-tooltip-title">' + CANDLE_INTERVALS[candleCurrentInterval].label
-            + ' · ' + period + '</div>'
+        '<div class="candle-tooltip-title">'
+            + escapeHtml(CANDLE_INTERVALS[candleCurrentInterval].label)
+            + ' · ' + escapeHtml(period) + '</div>'
         + '<div class="candle-tooltip-grid">'
-        + '<span>开盘</span><span>' + Number(candle.open).toFixed(2) + '</span>'
-        + '<span>最高</span><span>' + Number(candle.high).toFixed(2) + '</span>'
-        + '<span>最低</span><span>' + Number(candle.low).toFixed(2) + '</span>'
-        + '<span>收盘</span><span>' + Number(candle.close).toFixed(2) + '</span>'
-        + '<span>复权收盘</span><span>' + Number(candle.adjustedClose).toFixed(2) + '</span>'
-        + '<span>涨跌</span><span class="' + changeClass + '">' + changeText + '</span>'
-        + '<span>成交量</span><span>' + Number(candle.volume).toLocaleString('zh-CN') + '</span>'
+        + '<span>开盘</span><span>' + escapeHtml(Number(candle.open).toFixed(2)) + '</span>'
+        + '<span>最高</span><span>' + escapeHtml(Number(candle.high).toFixed(2)) + '</span>'
+        + '<span>最低</span><span>' + escapeHtml(Number(candle.low).toFixed(2)) + '</span>'
+        + '<span>收盘</span><span>' + escapeHtml(Number(candle.close).toFixed(2)) + '</span>'
+        + '<span>复权收盘</span><span>'
+            + escapeHtml(Number(candle.adjustedClose).toFixed(2)) + '</span>'
+        + '<span>涨跌</span><span class="' + changeClass + '">'
+            + escapeHtml(changeText) + '</span>'
+        + '<span>成交量</span><span>'
+            + escapeHtml(Number(candle.volume).toLocaleString('zh-CN')) + '</span>'
         + '</div>';
     tooltip.style.display = 'block';
 
