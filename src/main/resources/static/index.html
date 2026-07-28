@@ -824,13 +824,13 @@ function renderStatCards() {
     document.getElementById('stat-cash-pct').textContent = '占总价值 ' + cashPct.toFixed(1) + '%';
 
     // 分红信息
-    const divPaid = d.totalDividendPaid || 0;
-    const divPending = d.totalDividendPending || 0;
-    document.getElementById('stat-dividend-paid').textContent = '$' + divPaid.toFixed(2);
+    const divPaid = Number(d.totalDividendPaid || 0);
+    const divPending = Number(d.totalDividendPending || 0);
+    document.getElementById('stat-dividend-paid').textContent = fmt(divPaid);
     const totalDiv = divPaid + divPending;
-    const divYield = d.totalValue > 0 ? (totalDiv / d.totalValue * 100) : 0;
+    const divYield = Number(d.totalValue) > 0 ? (totalDiv / Number(d.totalValue) * 100) : 0;
     document.getElementById('stat-dividend-paid-sub').textContent = '累计股息率 ' + divYield.toFixed(2) + '%';
-    document.getElementById('stat-dividend-pending').textContent = '$' + divPending.toFixed(2);
+    document.getElementById('stat-dividend-pending').textContent = fmt(divPending);
     document.getElementById('stat-dividend-pending-sub').textContent = divPending > 0 ? '待派息日到账' : '暂无待到账分红';
 }
 
