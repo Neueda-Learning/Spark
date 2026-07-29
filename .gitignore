@@ -1,6 +1,6 @@
 target/
 *.class
-
+.vscode/
 .idea/
 *.iml
 .classpath

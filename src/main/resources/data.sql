@@ -32,4 +32,132 @@ INSERT IGNORE INTO stock (symbol, name, asset_type, sector, exchange, currency) 
 
 -- Default portfolio with $100,000 initial cash
 INSERT IGNORE INTO portfolio (id, name, cash_balance) VALUES
+
 (1, 'My Portfolio', 100000.00);
+
+-- Align the default portfolio cash with the seeded positions on first startup.
+UPDATE portfolio
+SET cash_balance = 91830.00
+WHERE id = 1 AND cash_balance = 100000.00;
+
+-- Seed a small live portfolio so overview, holdings, and weekly performance are not empty.
+INSERT IGNORE INTO holding (id, portfolio_id, stock_id, quantity, average_cost) VALUES
+(1001, 1, (SELECT id FROM stock WHERE symbol = 'AAPL'), 15.0000, 190.0000),
+(1002, 1, (SELECT id FROM stock WHERE symbol = 'MSFT'), 8.0000, 415.0000),
+(1003, 1, (SELECT id FROM stock WHERE symbol = 'AGG'), 20.0000, 100.0000);
+
+-- Seed matching trade history. Fixed ids keep this block idempotent across restarts.
+INSERT IGNORE INTO transaction (id, portfolio_id, stock_id, type, quantity, unit_price, total_amount, created_at) VALUES
+(1001, 1, (SELECT id FROM stock WHERE symbol = 'AAPL'), 'BUY', 15.0000, 190.0000, 2850.00, '2026-07-18 09:35:00'),
+(1002, 1, (SELECT id FROM stock WHERE symbol = 'MSFT'), 'BUY', 8.0000, 415.0000, 3320.00, '2026-07-19 10:10:00'),
+(1003, 1, (SELECT id FROM stock WHERE symbol = 'AGG'), 'BUY', 20.0000, 100.0000, 2000.00, '2026-07-23 14:20:00');
+
+
+-- ============================================
+-- Dividend History (2025 Q3 ~ 2026 Q3)
+-- ============================================
+
+-- AAPL: $0.25/share quarterly
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('AAPL', '2025-08-08', '2025-08-14', 0.2500, 'quarterly'),
+('AAPL', '2025-11-07', '2025-11-13', 0.2500, 'quarterly'),
+('AAPL', '2026-02-06', '2026-02-12', 0.2500, 'quarterly'),
+('AAPL', '2026-05-08', '2026-05-14', 0.2500, 'quarterly');
+
+-- MSFT: $0.75/share quarterly
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('MSFT', '2025-08-14', '2025-09-04', 0.7500, 'quarterly'),
+('MSFT', '2025-11-20', '2025-12-11', 0.7500, 'quarterly'),
+('MSFT', '2026-02-19', '2026-03-12', 0.7500, 'quarterly'),
+('MSFT', '2026-05-14', '2026-06-11', 0.7500, 'quarterly');
+
+-- NVDA: $0.01/share quarterly
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('NVDA', '2025-09-05', '2025-09-12', 0.0100, 'quarterly'),
+('NVDA', '2025-12-05', '2025-12-12', 0.0100, 'quarterly'),
+('NVDA', '2026-03-06', '2026-03-13', 0.0100, 'quarterly'),
+('NVDA', '2026-06-12', '2026-06-19', 0.0100, 'quarterly');
+
+-- META: $0.50/share quarterly
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('META', '2025-09-15', '2025-09-25', 0.5000, 'quarterly'),
+('META', '2025-12-15', '2026-01-09', 0.5000, 'quarterly'),
+('META', '2026-03-15', '2026-03-26', 0.5000, 'quarterly'),
+('META', '2026-06-15', '2026-06-26', 0.5000, 'quarterly');
+
+-- JPM: $1.05/share quarterly
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('JPM', '2025-09-04', '2025-10-01', 1.0500, 'quarterly'),
+('JPM', '2025-12-04', '2026-01-02', 1.0500, 'quarterly'),
+('JPM', '2026-03-05', '2026-04-01', 1.0500, 'quarterly'),
+('JPM', '2026-06-05', '2026-07-01', 1.0500, 'quarterly');
+
+-- JNJ: $1.24/share quarterly
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('JNJ', '2025-08-25', '2025-09-09', 1.2400, 'quarterly'),
+('JNJ', '2025-11-24', '2025-12-09', 1.2400, 'quarterly'),
+('JNJ', '2026-02-23', '2026-03-10', 1.2400, 'quarterly'),
+('JNJ', '2026-05-25', '2026-06-09', 1.2400, 'quarterly');
+
+-- V: $0.56/share quarterly
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('V', '2025-09-04', '2025-10-01', 0.5600, 'quarterly'),
+('V', '2025-12-04', '2026-01-02', 0.5600, 'quarterly'),
+('V', '2026-03-05', '2026-04-01', 0.5600, 'quarterly'),
+('V', '2026-06-04', '2026-07-01', 0.5600, 'quarterly');
+
+-- PG: $1.0175/share quarterly
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('PG', '2025-10-23', '2025-11-17', 1.0175, 'quarterly'),
+('PG', '2026-01-22', '2026-02-15', 1.0175, 'quarterly'),
+('PG', '2026-04-20', '2026-05-15', 1.0175, 'quarterly'),
+('PG', '2026-07-23', '2026-08-15', 1.0175, 'quarterly');
+
+-- XOM: $0.95/share quarterly
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('XOM', '2025-08-14', '2025-09-10', 0.9500, 'quarterly'),
+('XOM', '2025-11-13', '2025-12-10', 0.9500, 'quarterly'),
+('XOM', '2026-02-12', '2026-03-10', 0.9500, 'quarterly'),
+('XOM', '2026-05-14', '2026-06-10', 0.9500, 'quarterly');
+
+-- UNH: $2.00/share quarterly
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('UNH', '2025-09-05', '2025-09-30', 2.0000, 'quarterly'),
+('UNH', '2025-12-05', '2025-12-30', 2.0000, 'quarterly'),
+('UNH', '2026-03-06', '2026-03-30', 2.0000, 'quarterly'),
+('UNH', '2026-06-05', '2026-06-30', 2.0000, 'quarterly');
+
+-- MA: $0.77/share quarterly
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('MA', '2025-08-07', '2025-08-20', 0.7700, 'quarterly'),
+('MA', '2025-11-06', '2025-11-20', 0.7700, 'quarterly'),
+('MA', '2026-02-05', '2026-02-20', 0.7700, 'quarterly'),
+('MA', '2026-05-07', '2026-05-20', 0.7700, 'quarterly');
+
+-- AGG: $0.93/share quarterly (bond ETF)
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('AGG', '2025-09-03', '2025-09-10', 0.9300, 'quarterly'),
+('AGG', '2025-12-03', '2025-12-10', 0.9300, 'quarterly'),
+('AGG', '2026-03-04', '2026-03-11', 0.9300, 'quarterly'),
+('AGG', '2026-06-03', '2026-06-10', 0.9300, 'quarterly');
+
+-- BND: $0.44/share quarterly (bond ETF)
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('BND', '2025-09-04', '2025-09-10', 0.4400, 'quarterly'),
+('BND', '2025-12-04', '2025-12-10', 0.4400, 'quarterly'),
+('BND', '2026-03-05', '2026-03-11', 0.4400, 'quarterly'),
+('BND', '2026-06-04', '2026-06-10', 0.4400, 'quarterly');
+
+-- TLT: $0.66/share quarterly (bond ETF)
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('TLT', '2025-09-02', '2025-09-08', 0.6600, 'quarterly'),
+('TLT', '2025-12-02', '2025-12-08', 0.6600, 'quarterly'),
+('TLT', '2026-03-03', '2026-03-09', 0.6600, 'quarterly'),
+('TLT', '2026-06-02', '2026-06-08', 0.6600, 'quarterly');
+
+-- LQD: $0.65/share quarterly (bond ETF)
+INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
+('LQD', '2025-09-03', '2025-09-10', 0.6500, 'quarterly'),
+('LQD', '2025-12-03', '2025-12-10', 0.6500, 'quarterly'),
+('LQD', '2026-03-04', '2026-03-11', 0.6500, 'quarterly'),
+('LQD', '2026-06-03', '2026-06-10', 0.6500, 'quarterly');

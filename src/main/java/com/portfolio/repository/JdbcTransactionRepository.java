@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.time.LocalDate;
 import java.util.List;
 
 @Repository
@@ -60,6 +61,15 @@ public class JdbcTransactionRepository implements TransactionRepository {
                 "SELECT * FROM transaction WHERE portfolio_id = ? ORDER BY created_at DESC",
                 transactionRowMapper,
                 portfolioId
+        );
+    }
+
+    @Override
+    public List<Transaction> findByPortfolioIdAndStockIdBeforeDate(Long portfolioId, Long stockId, LocalDate date) {
+        return jdbc.query(
+                "SELECT * FROM transaction WHERE portfolio_id = ? AND stock_id = ? AND DATE(created_at) <= ? ORDER BY created_at ASC",
+                transactionRowMapper,
+                portfolioId, stockId, date
         );
     }
 }
