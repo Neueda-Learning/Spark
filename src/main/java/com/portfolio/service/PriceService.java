@@ -2,7 +2,6 @@ package com.portfolio.service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.List;
 
 public interface PriceService {
     /**
@@ -15,16 +14,6 @@ public interface PriceService {
      */
     BigDecimal getChangePercent(String symbol);
 
-    /**
-     * Get 7-day price history for a stock (for hover popup chart).
-     */
-    List<PriceHistoryResponse> getSevenDayPriceHistory(String symbol);
-
-    /**
-     * Get the closing price for a stock on a specific date.
-     * Used for historical calculations (e.g., performance replay/backfills).
-     */
-    BigDecimal getPriceOnDate(String symbol, LocalDate date);
     default LocalDate getPriceDate(String symbol) {
         return null;
     }

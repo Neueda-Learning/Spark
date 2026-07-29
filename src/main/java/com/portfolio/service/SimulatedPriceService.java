@@ -67,49 +67,6 @@ public class SimulatedPriceService implements PriceService {
         return BigDecimal.valueOf(change).setScale(2, RoundingMode.HALF_UP);
     }
 
-    @Override
-    public List<PriceHistoryResponse> getSevenDayPriceHistory(String symbol) {
-        BigDecimal base = BASE_PRICES.getOrDefault(symbol, new BigDecimal("100.00"));
-        boolean isCash = "USD".equals(symbol) || "USDMONEY".equals(symbol);
-        List<PriceHistoryResponse> history = new ArrayList<>();
-        LocalDate today = LocalDate.now();
-
-        for (int i = 6; i >= 0; i--) {
-            LocalDate date = today.minusDays(i);
-            double dayVariation;
-            if (isCash) {
-                dayVariation = 1.0;
-            } else {
-                // Deterministic variation per day
-                dayVariation = 1.0 + (seededRandom(symbol, i + 10) * 0.06 - 0.03); // ±3%
-            }
-            BigDecimal close = base.multiply(BigDecimal.valueOf(dayVariation)).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal open = base.multiply(BigDecimal.valueOf(1.0 + (seededRandom(symbol, i + 20) * 0.04 - 0.02)))
-                    .setScale(2, RoundingMode.HALF_UP);
-            BigDecimal high = close.max(open).multiply(BigDecimal.valueOf(1.0 + seededRandom(symbol, i + 30) * 0.01))
-                    .setScale(2, RoundingMode.HALF_UP);
-            BigDecimal low = close.min(open).multiply(BigDecimal.valueOf(1.0 - seededRandom(symbol, i + 40) * 0.01))
-                    .setScale(2, RoundingMode.HALF_UP);
-            long volume = isCash ? 0L : (long) (5_000_000 + seededRandom(symbol, i + 50) * 45_000_000);
-
-            history.add(new PriceHistoryResponse(date, open, close, high, low, volume));
-        }
-        return history;
-    }
-
-    @Override
-    public BigDecimal getPriceOnDate(String symbol, LocalDate date) {
-        BigDecimal base = BASE_PRICES.getOrDefault(symbol, new BigDecimal("100.00"));
-        // Cash items don't fluctuate
-        if ("USD".equals(symbol) || "USDMONEY".equals(symbol)) {
-            return base;
-        }
-        // Use date's day-of-year as seed offset for deterministic price
-        int dayOffset = date.getDayOfYear() + date.getYear() * 365;
-        double variation = 1.0 + (seededRandom(symbol, dayOffset) * 0.06 - 0.03); // ±3%
-        return base.multiply(BigDecimal.valueOf(variation)).setScale(2, RoundingMode.HALF_UP);
-    }
-
     /**
      * Generates a deterministic double between 0.0 and 1.0 for a given symbol and seed offset.
      */

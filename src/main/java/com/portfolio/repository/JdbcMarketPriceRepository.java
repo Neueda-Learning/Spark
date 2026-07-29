@@ -11,9 +11,16 @@ import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Repository
 public class JdbcMarketPriceRepository implements MarketPriceRepository {
@@ -133,5 +140,68 @@ public class JdbcMarketPriceRepository implements MarketPriceRepository {
                 Date.valueOf(startDate),
                 Date.valueOf(endDate)
         );
+    }
+
+    @Override
+    public List<LocalDate> findLatestTradeDates(int limit) {
+        if (limit <= 0) {
+            return List.of();
+        }
+        return jdbc.query(
+                "SELECT DISTINCT trade_date FROM market_price_daily ORDER BY trade_date DESC LIMIT ?",
+                (rs, rowNum) -> rs.getDate("trade_date").toLocalDate(),
+                limit
+        );
+    }
+
+    @Override
+    public Map<Long, BigDecimal> findClosePricesByTradeDate(
+            LocalDate tradeDate,
+            Collection<Long> stockIds
+    ) {
+        if (stockIds.isEmpty()) {
+            return Map.of();
+        }
+
+        String placeholders = stockIds.stream()
+                .map(id -> "?")
+                .collect(Collectors.joining(", "));
+        List<Object> arguments = new ArrayList<>();
+        arguments.add(Date.valueOf(tradeDate));
+        arguments.addAll(stockIds);
+
+        return jdbc.query(
+                "SELECT stock_id, close_price FROM market_price_daily "
+                        + "WHERE trade_date = ? AND stock_id IN (" + placeholders + ")",
+                rs -> {
+                    Map<Long, BigDecimal> prices = new LinkedHashMap<>();
+                    while (rs.next()) {
+                        prices.put(rs.getLong("stock_id"), rs.getBigDecimal("close_price"));
+                    }
+                    return prices;
+                },
+                arguments.toArray()
+        );
+    }
+
+    @Override
+    public LocalDateTime findLatestFetchedAtForTradeDates(List<LocalDate> tradeDates) {
+        if (tradeDates.isEmpty()) {
+            return null;
+        }
+
+        String placeholders = tradeDates.stream()
+                .map(date -> "?")
+                .collect(Collectors.joining(", "));
+        Object[] arguments = tradeDates.stream()
+                .map(Date::valueOf)
+                .toArray();
+        Timestamp timestamp = jdbc.query(
+                "SELECT MAX(fetched_at) AS latest_fetched_at FROM market_price_daily "
+                        + "WHERE trade_date IN (" + placeholders + ")",
+                rs -> rs.next() ? rs.getTimestamp("latest_fetched_at") : null,
+                arguments
+        );
+        return timestamp == null ? null : timestamp.toLocalDateTime();
     }
 }
