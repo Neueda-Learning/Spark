@@ -1,7 +1,11 @@
 package com.portfolio.service;
 
+import com.portfolio.dto.PortfolioOverviewResponse;
 import com.portfolio.dto.WeeklyPerformanceResponse;
+import com.portfolio.model.Holding;
+import com.portfolio.model.Portfolio;
 import com.portfolio.model.PortfolioPerformanceCache;
+import com.portfolio.model.Stock;
 import com.portfolio.model.Transaction;
 import com.portfolio.repository.DividendHistoryRepository;
 import com.portfolio.repository.HoldingRepository;
@@ -19,11 +23,14 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -65,6 +72,37 @@ class PortfolioServiceImplTest {
 
     @InjectMocks
     private PortfolioServiceImpl service;
+
+    @Test
+    void returnsEnglishAssetAllocationLabels() {
+        when(holdingRepository.findByPortfolioId(1L)).thenReturn(List.of(
+                new Holding(1L, 1L, 10L, new BigDecimal("2"), new BigDecimal("90.00")),
+                new Holding(2L, 1L, 20L, new BigDecimal("4"), new BigDecimal("45.00"))
+        ));
+        when(dividendHistoryRepository.findUpToDate(any(LocalDate.class))).thenReturn(List.of());
+        when(userDividendRepository.findPendingDividends(eq(1L), any(LocalDate.class))).thenReturn(List.of());
+        when(portfolioRepository.findById(1L)).thenReturn(Optional.of(
+                new Portfolio(1L, "Demo Portfolio", new BigDecimal("300.00"), LocalDateTime.now())
+        ));
+        when(stockRepository.findById(10L)).thenReturn(Optional.of(
+                new Stock(10L, "AAPL", "Apple Inc.", "STOCK", "Technology", "NASDAQ", "USD")
+        ));
+        when(stockRepository.findById(20L)).thenReturn(Optional.of(
+                new Stock(20L, "AGG", "iShares Core U.S. Aggregate Bond ETF", "BOND", "Fixed Income", "NYSE", "USD")
+        ));
+        when(priceService.getCurrentPrice("AAPL")).thenReturn(new BigDecimal("100.00"));
+        when(priceService.getCurrentPrice("AGG")).thenReturn(new BigDecimal("50.00"));
+        when(userDividendRepository.sumPaidByPortfolioIdAndDateRange(
+                eq(1L), any(LocalDate.class), any(LocalDate.class)
+        )).thenReturn(BigDecimal.ZERO);
+        when(userDividendRepository.sumPendingByPortfolioId(1L)).thenReturn(BigDecimal.ZERO);
+
+        PortfolioOverviewResponse result = service.getPortfolioOverview(1L);
+
+        assertThat(result.allocation())
+                .extracting(PortfolioOverviewResponse.AssetAllocation::label)
+                .containsExactly("Equities", "Fixed Income", "Cash");
+    }
 
     @Test
     void returnsEmptyWeeklyPerformanceWhenThereAreNoTradeDates() {

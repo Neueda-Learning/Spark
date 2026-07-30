@@ -35,9 +35,9 @@ public class PortfolioServiceImpl implements PortfolioService {
     private static final Logger log = LoggerFactory.getLogger(PortfolioServiceImpl.class);
 
     private static final Map<String, String> ASSET_TYPE_LABELS = Map.of(
-            "STOCK", "股票",
-            "BOND", "债券",
-            "CASH", "现金"
+            "STOCK", "Equities",
+            "BOND", "Fixed Income",
+            "CASH", "Cash"
     );
 
     private final PortfolioRepository portfolioRepository;
@@ -139,7 +139,7 @@ public class PortfolioServiceImpl implements PortfolioService {
                 ? portfolio.cashBalance().multiply(BigDecimal.valueOf(100)).divide(totalValue, 2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
         allocation.add(new PortfolioOverviewResponse.AssetAllocation(
-                "CASH", "现金",
+                "CASH", ASSET_TYPE_LABELS.get("CASH"),
                 portfolio.cashBalance().setScale(2, RoundingMode.HALF_UP),
                 cashPercentage
         ));

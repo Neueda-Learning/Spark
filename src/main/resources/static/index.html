@@ -232,11 +232,11 @@
         }
         .card-subtitle {
             font-size: 13px;
+            line-height: 1.45;
             color: var(--muted);
-            margin-bottom: 18px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            margin-bottom: 0;
+            white-space: normal;
+            overflow-wrap: break-word;
         }
 
         /* ===== Stat Cards ===== */
@@ -253,27 +253,69 @@
             border: 1px solid rgba(148,163,184,.16);
             padding: 24px;
             text-align: center;
+            min-height: 180px;
+            display: grid;
+            grid-template-rows: 32px 48px 40px;
+            align-content: center;
         }
         .stat-card .label {
-            font-size: 13px;
-            color: #64748b;
+            min-width: 0;
+            font-size: 12px;
+            line-height: 1.2;
+            font-weight: 700;
+            color: #475569;
             text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 8px;
+            letter-spacing: .65px;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .stat-card .value {
             font-size: 30px;
+            line-height: 1;
             font-weight: 700;
+            font-variant-numeric: tabular-nums;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .stat-card .sub {
-            font-size: 13px;
-            margin-top: 6px;
+            font-size: 12.5px;
+            line-height: 1.3;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .stat-card--accent .value {
+            color: var(--stat-value-color);
+        }
+        .stat-card--accent .sub {
+            color: var(--stat-sub-color);
+        }
+        .stat-card--cash {
+            --stat-value-color: #3b82f6;
+            --stat-sub-color: #2563eb;
+        }
+        .stat-card--dividends-received {
+            --stat-value-color: #10b981;
+            --stat-sub-color: #059669;
+        }
+        .stat-card--dividends-receivable {
+            --stat-value-color: #f59e0b;
+            --stat-sub-color: #d97706;
+        }
+        .stat-card--dividends-received .label,
+        .stat-card--dividends-receivable .label {
+            font-size: 11.5px;
+            letter-spacing: .55px;
         }
 
         /* ===== Chart Row ===== */
         .chart-row {
             display: grid;
-            grid-template-columns: minmax(320px, 0.78fr) minmax(600px, 1.22fr);
+            grid-template-columns: minmax(420px, .9fr) minmax(600px, 1.1fr);
             gap: 20px;
             align-items: stretch;
         }
@@ -285,13 +327,13 @@
         }
         .chart-panel-head {
             display: grid;
-            grid-template-columns: minmax(0, 1fr) minmax(320px, 360px);
+            grid-template-columns: minmax(230px, 1fr) minmax(300px, 330px);
             align-items: start;
             gap: 16px;
             margin-bottom: 18px;
         }
         .chart-card--allocation .chart-panel-head {
-            grid-template-columns: minmax(0, 1fr) minmax(220px, 240px);
+            grid-template-columns: minmax(180px, 1fr) minmax(250px, 270px);
             gap: 12px;
         }
         .chart-panel-copy {
@@ -319,26 +361,37 @@
         }
         .metric-pill {
             min-width: 0;
+            min-height: 76px;
             padding: 10px 12px;
             border-radius: 14px;
             background: linear-gradient(180deg, rgba(248,250,252,.98), rgba(241,245,249,.88));
             border: 1px solid rgba(148,163,184,.18);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
         .metric-pill .k {
             display: block;
             font-size: 11px;
+            line-height: 1.25;
             color: var(--muted);
             text-transform: uppercase;
-            letter-spacing: .08em;
+            letter-spacing: .05em;
             margin-bottom: 6px;
+            overflow-wrap: normal;
+            word-break: normal;
         }
         .metric-pill .v {
             display: block;
             font-size: 15px;
+            line-height: 1.25;
             font-weight: 700;
             color: var(--text);
+            overflow-wrap: normal;
+            word-break: normal;
         }
         .chart-card--allocation .metric-pill {
+            min-height: 72px;
             padding: 8px 10px;
         }
         .chart-card--allocation .metric-pill .k {
@@ -361,7 +414,7 @@
             gap: 0;
         }
         .chart-wrapper--pie {
-            height: 382px;
+            height: 410px;
             display: flex;
             flex-direction: column;
             align-items: stretch;
@@ -370,7 +423,7 @@
             padding: 14px 16px 14px;
         }
         .chart-wrapper--bar {
-            height: 382px;
+            height: 410px;
             padding: 14px 16px 10px;
         }
         .chart-wrapper canvas {
@@ -424,16 +477,19 @@
             gap: 4px;
             pointer-events: none;
             text-align: center;
+            width: 150px;
+            max-width: 44%;
         }
         .chart-center-label .k {
-            font-size: 11px;
-            letter-spacing: .08em;
+            font-size: 10px;
+            line-height: 1.2;
+            letter-spacing: .06em;
             text-transform: uppercase;
             color: #94a3b8;
             font-weight: 700;
         }
         .chart-center-label .v {
-            font-size: 20px;
+            font-size: 17px;
             line-height: 1.1;
             color: #0f172a;
             font-weight: 800;
@@ -706,16 +762,25 @@
         }
 
         /* ===== Responsive ===== */
-        @media (max-width: 1024px) {
+        @media (max-width: 1100px) {
             .stat-row { grid-template-columns: repeat(3, 1fr); }
+            .chart-row { grid-template-columns: 1fr; }
+            .chart-card--allocation .chart-panel-head {
+                grid-template-columns: minmax(230px, 1fr) minmax(300px, 330px);
+            }
         }
         @media (max-width: 768px) {
             .stat-row { grid-template-columns: 1fr; }
-            .chart-row { grid-template-columns: 1fr; }
             .chart-panel-head { grid-template-columns: 1fr; }
+            .chart-card--allocation .chart-panel-head { grid-template-columns: 1fr; }
             .chart-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .chart-wrapper--pie { height: 336px; }
-            .chart-wrapper--bar { height: 336px; }
+            .chart-wrapper--pie { height: 360px; }
+            .chart-wrapper--bar { height: 360px; }
+            .chart-center-label {
+                width: 138px;
+                max-width: 48%;
+            }
+            .chart-center-label .v { font-size: 16px; }
             .assistant-msg-charts { grid-template-columns: 1fr; }
             .stat-card .value { font-size: 24px; }
             table { font-size: 12px; }
@@ -740,9 +805,9 @@
 <!-- Navbar -->
 <nav class="navbar">
     <div class="brand">Portfolio Manager</div>
-    <button class="tab-btn active" data-tab="overview">Portfolio Overview</button>
-    <button class="tab-btn" data-tab="operations">Investment Operations</button>
-    <button class="tab-btn" data-tab="assistant">Invest Assistant</button>
+    <button class="tab-btn active" data-tab="overview">Overview</button>
+    <button class="tab-btn" data-tab="operations">Trading</button>
+    <button class="tab-btn" data-tab="assistant">Wiki</button>
 </nav>
 
 <div class="container">
@@ -751,29 +816,29 @@
     <div id="tab-overview" class="tab-content active">
         <div class="stat-row">
             <div class="stat-card">
-                <div class="label">Total Value</div>
+                <div class="label">Portfolio Value</div>
                 <div class="value" id="stat-total-value">--</div>
                 <div class="sub" id="stat-total-change">--</div>
             </div>
             <div class="stat-card">
-                <div class="label">Total P&L</div>
+                <div class="label">Unrealized P&L</div>
                 <div class="value" id="stat-total-pnl">--</div>
                 <div class="sub" id="stat-total-return">--</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card stat-card--accent stat-card--cash">
                 <div class="label">Cash Balance</div>
-                <div class="value" style="color:#3b82f6" id="stat-cash">--</div>
-                <div class="sub" style="color:#94a3b8" id="stat-cash-pct">--</div>
+                <div class="value" id="stat-cash">--</div>
+                <div class="sub" id="stat-cash-pct">--</div>
             </div>
-            <div class="stat-card">
-                <div class="label">Dividends Paid</div>
-                <div class="value" style="color:#10b981" id="stat-dividend-paid">--</div>
-                <div class="sub" style="color:#94a3b8" id="stat-dividend-paid-sub">--</div>
+            <div class="stat-card stat-card--accent stat-card--dividends-received">
+                <div class="label">Net Dividends Received</div>
+                <div class="value" id="stat-dividend-paid">--</div>
+                <div class="sub" id="stat-dividend-paid-sub">--</div>
             </div>
-            <div class="stat-card">
-                <div class="label">Dividends Pending</div>
-                <div class="value" style="color:#f59e0b" id="stat-dividend-pending">--</div>
-                <div class="sub" style="color:#94a3b8" id="stat-dividend-pending-sub">--</div>
+            <div class="stat-card stat-card--accent stat-card--dividends-receivable">
+                <div class="label">Net Dividends Receivable</div>
+                <div class="value" id="stat-dividend-pending">--</div>
+                <div class="sub" id="stat-dividend-pending-sub">--</div>
             </div>
         </div>
         <div class="chart-row">
@@ -782,7 +847,7 @@
                     <div class="chart-panel-copy">
                         <div class="eyebrow">Allocation</div>
                         <div class="card-title">Asset Allocation</div>
-                        <div class="card-subtitle">View the asset structure distribution of your portfolio.</div>
+                        <div class="card-subtitle">Portfolio composition by current market value.</div>
                     </div>
                     <div class="chart-meta" id="allocation-meta"></div>
                 </div>
@@ -800,8 +865,8 @@
                 <div class="chart-panel-head">
                     <div class="chart-panel-copy">
                         <div class="eyebrow">Performance</div>
-                        <div class="card-title">7-Day Unrealized P&L Trend</div>
-                        <div class="card-subtitle">Bars show absolute unrealized P&L; line shows return rate.</div>
+                        <div class="card-title">Unrealized P&L Trend</div>
+                        <div class="card-subtitle">Last 7 trading days. Bars show unrealized P&L; the line shows return on cost.</div>
                     </div>
                     <div class="chart-meta" id="performance-meta"></div>
                 </div>
@@ -974,8 +1039,8 @@ function fmtPct(n) {
 function pnlClass(n) { return n >= 0 ? 'positive' : 'negative'; }
 function assetTypeDisplayName(assetType, fallbackLabel) {
     const labelMap = {
-        'STOCK': 'Stock',
-        'BOND': 'Bond',
+        'STOCK': 'Equities',
+        'BOND': 'Fixed Income',
         'CASH': 'Cash'
     };
     return labelMap[assetType] || fallbackLabel || assetType || 'Other';
@@ -1045,7 +1110,7 @@ function renderStatCards() {
     document.getElementById('stat-total-value').textContent = fmt(d.totalValue);
     const chg = d.totalProfit || 0;
     const chgEl = document.getElementById('stat-total-change');
-    chgEl.textContent = (chg >= 0 ? '▲ ' : '▼ ') + fmt(Math.abs(chg));
+    chgEl.textContent = 'Unrealized P&L: ' + (chg >= 0 ? '+' : '-') + fmt(Math.abs(chg));
     chgEl.className = 'sub ' + pnlClass(chg);
 
     const pnlEl = document.getElementById('stat-total-pnl');
@@ -1057,17 +1122,17 @@ function renderStatCards() {
 
     document.getElementById('stat-cash').textContent = fmt(d.cashBalance);
     const cashPct = d.totalValue > 0 ? (d.cashBalance / d.totalValue * 100) : 0;
-    document.getElementById('stat-cash-pct').textContent = 'Portfolio share ' + cashPct.toFixed(1) + '%';
+    document.getElementById('stat-cash-pct').textContent = cashPct.toFixed(1) + '% of portfolio';
 
     // Dividend information
     const divPaid = Number(d.totalDividendPaid || 0);
     const divPending = Number(d.totalDividendPending || 0);
     document.getElementById('stat-dividend-paid').textContent = fmt(divPaid);
-    const totalDiv = divPaid + divPending;
-    const divYield = Number(d.totalValue) > 0 ? (totalDiv / Number(d.totalValue) * 100) : 0;
-    document.getElementById('stat-dividend-paid-sub').textContent = 'Cumulative yield ' + divYield.toFixed(2) + '%';
+    document.getElementById('stat-dividend-paid-sub').textContent = 'Received since Jan 1, 2025';
     document.getElementById('stat-dividend-pending').textContent = fmt(divPending);
-    document.getElementById('stat-dividend-pending-sub').textContent = divPending > 0 ? 'Pending on ex-dividend date' : 'No pending dividends';
+    document.getElementById('stat-dividend-pending-sub').textContent = divPending > 0
+        ? 'Awaiting payment'
+        : 'No payment pending';
 }
 
 function renderOverviewInsights() {
@@ -1079,20 +1144,17 @@ function renderOverviewInsights() {
     const dominant = allocation.slice().sort((a, b) => (b.value || 0) - (a.value || 0))[0];
     const dominantPct = dominant && allocationTotal > 0 ? ((dominant.value || 0) / allocationTotal * 100).toFixed(1) + '%' : '--';
     allocationMeta.innerHTML = [
-        createMetricPill('Asset Types', String(allocation.length || 0)),
-        createMetricPill('Top Weight', dominant ? dominant.assetType : '--'),
-        createMetricPill('Share', dominantPct)
+        createMetricPill('Asset Classes', String(allocation.length || 0)),
+        createMetricPill('Largest Class', dominant ? (dominant.label || dominant.assetType) : '--'),
+        createMetricPill('Largest Weight', dominantPct)
     ].join('');
 
     const performance = weeklyData || [];
     const latest = performance.length ? performance[performance.length - 1] : null;
-    const avgReturn = performance.length
-        ? performance.reduce((sum, item) => sum + Number(item.returnRate || 0), 0) / performance.length
-        : 0;
     performanceMeta.innerHTML = [
-        createMetricPill('Window', performance.length ? performance.length + ' days' : '--'),
+        createMetricPill('Period', performance.length ? performance.length + ' trading days' : '--'),
         createMetricPill('Latest P&L', latest ? fmt(latest.dailyProfit || 0) : '--'),
-        createMetricPill('Avg Return', performance.length ? fmtPct(avgReturn) : '--')
+        createMetricPill('Latest Return', latest ? fmtPct(latest.returnRate || 0) : '--')
     ].join('');
 }
 
@@ -1187,8 +1249,8 @@ function renderPieChart() {
     const centerLabel = document.getElementById('allocationCenterLabel');
     const legend = document.getElementById('allocationLegend');
     centerLabel.innerHTML = total > 0
-        ? '<div class="k">Total Value</div><div class="v">' + fmt(total) + '</div>'
-        : '<div class="k">Total Value</div><div class="v">--</div>';
+        ? '<div class="k">Portfolio Value</div><div class="v">' + fmt(total) + '</div>'
+        : '<div class="k">Portfolio Value</div><div class="v">--</div>';
     legend.innerHTML = labels.map((label, index) => {
         return '<span class="pie-chart-legend-item">'
             + '<span class="pie-chart-legend-dot" style="background:' + colors[index] + '"></span>'
@@ -1207,8 +1269,8 @@ function renderPieChart() {
                 backgroundColor: colors,
                 borderWidth: 3,
                 borderColor: '#fff',
-                radius: '68%',
-                cutout: '56%',
+                radius: '78%',
+                cutout: '68%',
                 hoverOffset: 8,
                 offset: offsets
             }]
@@ -1258,7 +1320,7 @@ function renderBarLineChart() {
             labels,
             datasets: [
                 {
-                    label: 'Daily Unrealized P&L',
+                    label: 'Unrealized P&L',
                     data: pnlData,
                     backgroundColor: pnlData.map(v => v >= 0 ? 'rgba(34,197,94,.7)' : 'rgba(239,68,68,.7)'),
                     borderRadius: 4,
@@ -1268,7 +1330,7 @@ function renderBarLineChart() {
                     order: 2
                 },
                 {
-                    label: 'Return Rate',
+                    label: 'Unrealized Return',
                     data: retData,
                     type: 'line',
                     borderColor: '#8b5cf6',
@@ -1294,14 +1356,14 @@ function renderBarLineChart() {
                 },
                 y: {
                     position: 'left',
-                    title: { display: true, text: 'Unrealized P&L ($)', color: '#64748b', font: { size: 12, weight: '700' } },
+                    title: { display: true, text: 'Unrealized P&L (USD)', color: '#64748b', font: { size: 12, weight: '700' } },
                     ticks: { color: '#64748b' },
                     grid: { color: 'rgba(226,232,240,.9)' },
                     grace: '10%'
                 },
                 y1: {
                     position: 'right',
-                    title: { display: true, text: 'Return Rate (%)', color: '#64748b', font: { size: 12, weight: '700' } },
+                    title: { display: true, text: 'Unrealized Return (%)', color: '#64748b', font: { size: 12, weight: '700' } },
                     grid: { drawOnChartArea: false },
                     ticks: { callback: v => v + '%', color: '#64748b' }
                 }
