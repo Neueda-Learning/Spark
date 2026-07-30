@@ -1,119 +1,242 @@
 # Spark Portfolio Manager
 
-Spring Boot + MySQL portfolio demo project. In production, the application reads
-post-close daily Yahoo Finance market data from the database. The `demo` and `test`
-profiles use deterministic simulated prices. The frontend is served directly by
-Spring Boot and includes a portfolio dashboard, trading page, candlestick charts,
-and an AI investment assistant.
+[![CI](https://github.com/Neueda-Learning/Spark/actions/workflows/ci.yml/badge.svg)](https://github.com/Neueda-Learning/Spark/actions/workflows/ci.yml)
+![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.5-6DB33F?logo=springboot&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)
 
-## Requirements
+Spark Portfolio Manager is a full-stack investment portfolio application built by
+**Team Spark**. It combines portfolio tracking, simulated trading, dividend
+accounting, historical market data, interactive charts, and an AI-assisted
+investment workspace in one Spring Boot application.
+
+The application is designed as an educational portfolio simulator. Transactions
+use the latest available post-close price stored in the database; they are not
+connected to a brokerage and do not represent real-time trade execution.
+
+## Features
+
+- **Portfolio dashboard** — monitor total value, cash balance, unrealized profit
+  and loss, return rate, paid dividends, and pending dividends.
+- **Performance analytics** — explore asset allocation and the last seven trading
+  days of portfolio performance.
+- **Portfolio operations** — deposit cash and execute validated buy or sell
+  transactions.
+- **Market catalogue** — browse stocks, bond ETFs, cash instruments, current
+  prices, and daily price changes.
+- **Candlestick charts** — inspect daily, weekly, and monthly OHLCV history with
+  interactive tooltips.
+- **Market data synchronization** — backfill and reconcile Yahoo Finance daily
+  market data with idempotent database updates.
+- **AI investment assistant** — ask portfolio-aware questions through a standard
+  or streaming chat endpoint backed by an OpenAI-compatible provider.
+- **Ready-to-use sample portfolio** — start with seeded instruments, holdings,
+  transactions, dividends, and recent market prices.
+
+## Tech Stack
+
+| Layer | Technology |
+| --- | --- |
+| Backend | Java 21, Spring Boot 3.3.5, Spring Web |
+| Persistence | Spring Data JDBC, MySQL 8 |
+| Validation | Jakarta Bean Validation |
+| Frontend | HTML, CSS, vanilla JavaScript, Chart.js 4 |
+| Market data | Yahoo Finance chart API |
+| AI integration | OpenAI-compatible chat completions API |
+| Build and test | Maven, JUnit 5, Mockito, GitHub Actions |
+
+## Architecture
+
+```mermaid
+flowchart LR
+    UI["Browser UI<br/>HTML, CSS, JavaScript"] --> API["Spring REST Controllers"]
+    API --> SVC["Portfolio, Trading,<br/>Chart and AI Services"]
+    SVC --> DB[("MySQL")]
+    SVC --> LLM["OpenAI-compatible<br/>LLM Provider"]
+    SYNC["Scheduled Market Data Sync"] --> YF["Yahoo Finance"]
+    SYNC --> DB
+```
+
+The frontend is served from the same Spring Boot process as the REST API. Portfolio
+state, transactions, dividends, cached performance, and daily prices are persisted
+in MySQL. In the default profile, scheduled jobs keep Yahoo market data current.
+
+## Prerequisites
 
 - JDK 21
-- Maven 3.8+
-- MySQL 8.0+
+- Maven 3.8 or later
+- MySQL 8.0 or later
+- An API key for an OpenAI-compatible model provider, only if the AI assistant is
+  required
 
-## Configuration
+## Getting Started
 
-The application reads an optional `.env` file from the project root. You can also
-provide the same values through environment variables:
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Neueda-Learning/Spark.git
+cd Spark
+```
+
+### 2. Configure the application
+
+Create a `.env` file in the project root:
 
 ```properties
 SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3306/portfoliodb?useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
 SPRING_DATASOURCE_USERNAME=root
-SPRING_DATASOURCE_PASSWORD=your-password
+SPRING_DATASOURCE_PASSWORD=your-database-password
 
-AI_PROVIDER=qwen
-AI_CHAT_URL=https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions
-AI_MODEL=qwen-plus
-AI_API_KEY=your-api-key
+# Optional: required only for the AI assistant
+AI_PROVIDER=openai
+AI_CHAT_URL=https://api.openai.com/v1/chat/completions
+AI_MODEL=gpt-4o-mini
+AI_API_KEY=your-provider-api-key
 ```
 
-`.env` is already ignored by Git. Do not commit database passwords or AI API keys.
+The same settings can be supplied as environment variables. The `.env` file and
+its variants are ignored by Git; never commit credentials.
 
-## Start
+The configured MySQL user must be able to connect to the server and create or
+update the application database. Spring Boot automatically applies
+`schema.sql` and `data.sql` during startup.
+
+### 3. Run the application
 
 ```bash
 mvn spring-boot:run
 ```
 
-Then open <http://localhost:8080>.
+Open [http://localhost:8080](http://localhost:8080) in a browser.
 
-## Initialize Market Data
+### 4. Run the test suite
 
-Before the first run, make sure MySQL is available and that the database connection
-settings are provided through environment variables or local configuration.
-The daily market data table is created automatically by `src/main/resources/schema.sql`.
+```bash
+mvn test
+```
 
-Historical backfill on first startup is enabled by default. When the database is new
-or history coverage is incomplete, the app fills the most recent 60 months of data.
-When history is already complete, it only syncs the most recent 10-day overlap window.
+To create the packaged application:
 
-To disable startup backfill temporarily:
+```bash
+mvn package
+java -jar target/portfolio-manager-1.0.0.jar
+```
+
+## Runtime Modes
+
+### Default mode
+
+The default profile reads post-close prices from MySQL and keeps the database
+updated through Yahoo Finance:
+
+- startup backfill: up to 60 months of history;
+- overlap window: the most recent 10 days;
+- post-close sync: 18:30, Monday to Friday, New York time;
+- reconciliation sync: 08:00, Monday to Friday, New York time.
+
+Disable startup backfill when needed:
 
 ```bash
 mvn spring-boot:run \
   -Dspring-boot.run.arguments=--market-data.backfill-on-startup=false
 ```
 
-Backfill isolates failures by stock and performs idempotent updates through the
-unique key `(stock_id, trade_date)`. During normal operation, the application syncs
-post-close daily bars at 18:30 New York time on trading weekdays, plus a reconciliation
-sync at 08:00.
+### Demo mode
 
-## Initialize Demo Portfolio
-
-A new database is seeded with a 100,000 USD demo portfolio containing stocks, bond
-ETFs, and cash. The six initial buys use Yahoo closing prices from 2025-07-01:
-
-- Stocks: AAPL 45 shares, MSFT 35 shares, PG 80 shares, XOM 70 shares
-- Bond ETFs: AGG 170 shares, BND 200 shares
-- Initial invested capital: 78,580.35 USD
-- Initial cash: 21,419.65 USD
-
-Using the seeded prices as of 2026-07-29 and the first overview request after
-historical dividends are processed, the initial allocation is approximately
-49.3% stocks, 29.7% bonds, and 21.0% cash. Initialization also includes verified
-dividend records for AAPL, AGG, and PG cross-checked against issuer pages and Yahoo
-events so the app can show both paid and pending dividends. `data.sql` ships with the
-latest 8 common trading days of prices for all seeded positions, which allows the app
-to generate 7-day portfolio performance before Yahoo backfill finishes.
-
-## Demo Mode
-
-If you do not need real market data, run with simulated prices:
+Use deterministic simulated prices instead of the production market-data flow:
 
 ```bash
 mvn spring-boot:run -Dspring-boot.run.profiles=demo
 ```
 
-## Weekly Candles API
+Demo mode still uses MySQL for portfolio persistence.
 
-```http
-GET /api/stocks/{id}/candles?interval=WEEKLY&limit=52
-```
+## Configuration Reference
 
-Clicking a non-CASH instrument row on the trades page opens the weekly candlestick
-modal. Buy and sell operations still use the latest available post-close price stored
-in the database, not a real-time execution price.
+| Variable | Default | Description |
+| --- | --- | --- |
+| `SPRING_DATASOURCE_URL` | `jdbc:mysql://localhost:3306/portfoliodb...` | MySQL JDBC connection URL |
+| `SPRING_DATASOURCE_USERNAME` | Empty | MySQL username |
+| `SPRING_DATASOURCE_PASSWORD` | Empty | MySQL password |
+| `AI_PROVIDER` | `qwen` | AI provider label used by the LLM gateway |
+| `AI_CHAT_URL` | Configured compatible endpoint | Chat completions endpoint |
+| `AI_MODEL` | `qwen-plus` | Provider model name |
+| `AI_API_KEY` | Empty | Bearer token for AI requests |
+| `AI_MARKET_DATA_MODE` | `internal` | AI context source: `internal` or `yahoo` |
 
-## AI Investment Assistant
+Additional market-data scheduling and backfill settings are available in
+[`src/main/resources/application.properties`](src/main/resources/application.properties).
 
-The assistant supports both standard and streaming responses:
+## API Overview
 
-```http
-POST /api/portfolio/ai-assistant/chat
-POST /api/portfolio/ai-assistant/chat/stream
-```
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/api/portfolio/overview` | Return portfolio totals, returns, allocation, and dividends |
+| `GET` | `/api/portfolio/weekly-performance` | Return performance for the latest seven trading days |
+| `GET` | `/api/portfolio/holdings` | List current holdings |
+| `POST` | `/api/portfolio/deposit` | Add cash to the portfolio |
+| `POST` | `/api/portfolio/transactions` | Execute a validated `BUY` or `SELL` transaction |
+| `GET` | `/api/stocks` | List all supported instruments with latest prices |
+| `GET` | `/api/stocks/{id}` | Return one instrument |
+| `GET` | `/api/stocks/{id}/candles` | Return `DAILY`, `WEEKLY`, or `MONTHLY` candles |
+| `POST` | `/api/portfolio/ai-assistant/chat` | Request a complete AI response |
+| `POST` | `/api/portfolio/ai-assistant/chat/stream` | Stream an AI response as plain text |
 
-By default, the assistant uses internal system market data as context. To allow it to
-query Yahoo Finance directly, set:
-
-```properties
-AI_MARKET_DATA_MODE=yahoo
-```
-
-## Verification
+Example transaction:
 
 ```bash
-mvn test
+curl -X POST http://localhost:8080/api/portfolio/transactions \
+  -H "Content-Type: application/json" \
+  -d '{"stockId":1,"type":"BUY","quantity":2}'
 ```
+
+Example candlestick request:
+
+```bash
+curl "http://localhost:8080/api/stocks/1/candles?interval=WEEKLY&limit=52"
+```
+
+## Sample Data
+
+On first startup, the application creates a USD 100,000 sample portfolio with:
+
+- positions in AAPL, MSFT, PG, XOM, AGG, and BND;
+- a broader catalogue of US equities, bond ETFs, and cash instruments;
+- historical buy transactions and dividend events;
+- recent daily OHLCV records so the dashboard can render before a full Yahoo
+  backfill finishes.
+
+Seed operations are idempotent, so restarting the application does not duplicate
+the initial records.
+
+## Project Structure
+
+```text
+.
+├── .github/workflows/ci.yml        # Build and test workflow
+├── src/main/java/com/portfolio
+│   ├── config/                     # HTTP, database, and static-resource config
+│   ├── controller/                 # REST API endpoints
+│   ├── dto/                        # API request and response contracts
+│   ├── model/                      # Domain models
+│   ├── repository/                 # JDBC persistence layer
+│   ├── scheduler/                  # Market-data jobs and startup backfill
+│   └── service/                    # Portfolio, market-data, trading, and AI logic
+├── src/main/resources
+│   ├── static/index.html           # Browser application
+│   ├── application.properties      # Runtime configuration
+│   ├── schema.sql                  # MySQL schema
+│   └── data.sql                    # Idempotent sample data
+└── src/test                        # Unit and integration tests
+```
+
+## Important Notes
+
+- This project is for educational and demonstration purposes.
+- Market prices are post-close data and may be delayed or unavailable.
+- AI-generated output is informational only and is not financial advice.
+- Buy and sell operations are simulated and do not place real brokerage orders.
+
+## Team
+
+Built by **Spark**.
