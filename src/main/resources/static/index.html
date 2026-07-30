@@ -870,10 +870,10 @@
     <div id="tab-operations" class="tab-content">
         <!-- Bank Deposit Bar -->
         <div class="deposit-bar">
-            <span class="deposit-label">💰 Bank Deposit</span>
-            <input type="number" id="deposit-amount" placeholder="Enter amount" min="0.01" step="0.01">
-            <button class="btn-deposit" onclick="handleDeposit()">Deposit</button>
-            <span class="deposit-msg" id="deposit-msg"></span>
+            <label class="deposit-label" for="deposit-amount">Bank Deposit</label>
+            <input type="number" id="deposit-amount" placeholder="Enter amount" min="0.01" step="0.01" inputmode="decimal" aria-describedby="deposit-msg">
+            <button class="btn-deposit" type="button" onclick="handleDeposit()">Deposit</button>
+            <span class="deposit-msg" id="deposit-msg" role="status" aria-live="polite"></span>
         </div>
 
         <!-- Holdings -->
