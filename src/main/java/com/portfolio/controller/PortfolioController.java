@@ -2,6 +2,9 @@ package com.portfolio.controller;
 
 import com.portfolio.dto.*;
 import com.portfolio.service.PortfolioService;
+
+import jakarta.validation.Valid;
+
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -50,7 +53,7 @@ public class PortfolioController {
      * 将指定金额存入组合现金余额
      */
     @PostMapping("/deposit")
-    public DepositResponse deposit(@RequestBody DepositRequest request) {
+    public DepositResponse deposit(@Valid @RequestBody DepositRequest request) {
         return portfolioService.deposit(DEFAULT_PORTFOLIO_ID, request.amount());
     }
 
