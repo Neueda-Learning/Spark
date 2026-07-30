@@ -363,9 +363,11 @@
         .chart-wrapper--pie {
             height: 382px;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 14px 16px 10px;
+            flex-direction: column;
+            align-items: stretch;
+            justify-content: flex-start;
+            gap: 10px;
+            padding: 14px 16px 14px;
         }
         .chart-wrapper--bar {
             height: 382px;
@@ -374,6 +376,68 @@
         .chart-wrapper canvas {
             width: 100% !important;
             height: 100% !important;
+        }
+        .chart-card--allocation .chart-wrapper canvas {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        .pie-chart-canvas-wrap {
+            position: relative;
+            flex: 1 1 auto;
+            min-height: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .pie-chart-legend {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 10px 18px;
+            width: 100%;
+            padding: 0 6px;
+        }
+        .pie-chart-legend-item {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #475569;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .pie-chart-legend-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            flex: 0 0 auto;
+        }
+        .chart-center-label {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            pointer-events: none;
+            text-align: center;
+        }
+        .chart-center-label .k {
+            font-size: 11px;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: #94a3b8;
+            font-weight: 700;
+        }
+        .chart-center-label .v {
+            font-size: 20px;
+            line-height: 1.1;
+            color: #0f172a;
+            font-weight: 800;
+            white-space: nowrap;
         }
 
         /* ===== Tables ===== */
@@ -724,7 +788,11 @@
                 </div>
                 <div class="allocation-layout">
                     <div class="chart-wrapper chart-wrapper--pie">
-                        <canvas id="pieChart"></canvas>
+                        <div class="pie-chart-canvas-wrap">
+                            <canvas id="pieChart"></canvas>
+                            <div class="chart-center-label" id="allocationCenterLabel" aria-hidden="true"></div>
+                        </div>
+                        <div class="pie-chart-legend" id="allocationLegend" aria-hidden="true"></div>
                     </div>
                 </div>
             </div>
@@ -1026,9 +1094,103 @@ function renderPieChart() {
     const labels = (d.allocation || []).map(a => a.label || a.assetType);
     const values = (d.allocation || []).map(a => a.value || 0);
     const colors = (d.allocation || []).map(a => colorMap[a.assetType] || '#94a3b8');
+    const total = values.reduce((sum, value) => sum + Number(value || 0), 0);
+    const maxValue = values.length ? Math.max(...values) : 0;
+    const highlightedIndex = values.findIndex(value => value === maxValue);
+    const offsets = values.map((_, index) => index === highlightedIndex && maxValue > 0 ? 18 : 0);
+    const allocationCalloutPlugin = {
+        id: 'allocationCalloutPlugin',
+        afterDatasetsDraw(chart) {
+            const dataset = chart.data.datasets[0];
+            const meta = chart.getDatasetMeta(0);
+            if (!meta || !meta.data || !meta.data.length) return;
+
+            const ctx = chart.ctx;
+            const chartArea = chart.chartArea;
+            const items = meta.data.map((arc, index) => {
+                const value = Number(dataset.data[index] || 0);
+                if (value <= 0 || total <= 0) return null;
+
+                const angle = (arc.startAngle + arc.endAngle) / 2;
+                const direction = Math.cos(angle) >= 0 ? 1 : -1;
+                const x1 = arc.x + Math.cos(angle) * (arc.outerRadius + offsets[index] + 4);
+                const y1 = arc.y + Math.sin(angle) * (arc.outerRadius + offsets[index] + 4);
+                const x2 = arc.x + Math.cos(angle) * (arc.outerRadius + offsets[index] + 16);
+                const y2 = arc.y + Math.sin(angle) * (arc.outerRadius + offsets[index] + 16);
+                return {
+                    index,
+                    direction,
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    targetY: y2,
+                    pct: (value / total * 100).toFixed(1) + '%'
+                };
+            }).filter(Boolean);
+
+            const distribute = sideItems => {
+                const sorted = sideItems.slice().sort((a, b) => a.targetY - b.targetY);
+                const minY = chartArea.top + 18;
+                const maxY = chartArea.bottom - 18;
+                const gap = 18;
+
+                sorted.forEach((item, index) => {
+                    const floor = index === 0 ? minY : sorted[index - 1].targetY + gap;
+                    item.targetY = Math.max(item.targetY, floor);
+                });
+
+                for (let index = sorted.length - 1; index >= 0; index -= 1) {
+                    const ceiling = index === sorted.length - 1 ? maxY : sorted[index + 1].targetY - gap;
+                    sorted[index].targetY = Math.min(sorted[index].targetY, ceiling);
+                }
+
+                return sorted;
+            };
+
+            const leftItems = distribute(items.filter(item => item.direction < 0));
+            const rightItems = distribute(items.filter(item => item.direction > 0));
+            const labelEndLeft = chartArea.left + 22;
+            const labelEndRight = chartArea.right - 22;
+
+            ctx.save();
+            ctx.lineWidth = 1.5;
+            ctx.font = '600 12px Segoe UI';
+            ctx.fillStyle = '#334155';
+            ctx.strokeStyle = 'rgba(100,116,139,.9)';
+            ctx.textBaseline = 'middle';
+
+            [...leftItems, ...rightItems].forEach(item => {
+                const lineEndX = item.direction > 0 ? labelEndRight : labelEndLeft;
+                const textX = item.direction > 0 ? lineEndX + 6 : lineEndX - 6;
+                ctx.beginPath();
+                ctx.moveTo(item.x1, item.y1);
+                ctx.lineTo(item.x2, item.targetY);
+                ctx.lineTo(lineEndX, item.targetY);
+                ctx.stroke();
+
+                ctx.textAlign = item.direction > 0 ? 'left' : 'right';
+                ctx.fillText(item.pct, textX, item.targetY);
+            });
+
+            ctx.restore();
+        }
+    };
+    const centerLabel = document.getElementById('allocationCenterLabel');
+    const legend = document.getElementById('allocationLegend');
+    centerLabel.innerHTML = total > 0
+        ? '<div class="k">Total Value</div><div class="v">' + fmt(total) + '</div>'
+        : '<div class="k">Total Value</div><div class="v">--</div>';
+    legend.innerHTML = labels.map((label, index) => {
+        return '<span class="pie-chart-legend-item">'
+            + '<span class="pie-chart-legend-dot" style="background:' + colors[index] + '"></span>'
+            + '<span>' + label + '</span>'
+            + '</span>';
+    }).join('');
     const ctx = document.getElementById('pieChart').getContext('2d');
     if (pieChartInstance) pieChartInstance.destroy();
     pieChartInstance = new Chart(ctx, {
+        plugins: [allocationCalloutPlugin],
         type: 'doughnut',
         data: {
             labels: labels,
@@ -1037,13 +1199,16 @@ function renderPieChart() {
                 backgroundColor: colors,
                 borderWidth: 3,
                 borderColor: '#fff',
-                radius: '82%'
+                radius: '68%',
+                cutout: '56%',
+                hoverOffset: 8,
+                offset: offsets
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            layout: { padding: { top: 2, bottom: 2, left: 2, right: 2 } },
+            layout: { padding: { top: 24, bottom: 10, left: 34, right: 34 } },
             plugins: {
                 legend: { display: false },
                 tooltip: {
@@ -1053,8 +1218,8 @@ function renderPieChart() {
                     padding: 12,
                     callbacks: {
                         label: ctx => {
-                            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
-                            const pct = total > 0 ? (ctx.parsed / total * 100).toFixed(1) : 0;
+                            const totalValue = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                            const pct = totalValue > 0 ? (ctx.parsed / totalValue * 100).toFixed(1) : 0;
                             return ctx.label + ': $' + ctx.parsed.toFixed(2) + '  (' + pct + '%)';
                         }
                     }
