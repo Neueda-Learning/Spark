@@ -37,6 +37,7 @@ class MarketDataSyncServiceImplTest {
         Stock aapl = stock(1L, "AAPL", "STOCK");
         Stock cash = stock(20L, "USD", "CASH");
         when(stockRepository.findAll()).thenReturn(List.of(aapl, cash));
+        when(marketPriceRepository.findFirstTradeDate(1L)).thenReturn(Optional.empty());
         when(marketPriceRepository.findLastTradeDate(1L)).thenReturn(Optional.empty());
         when(provider.fetchDailyPrices(eq(1L), eq("AAPL"), any(), eq(LocalDate.of(2026, 7, 27))))
                 .thenReturn(List.of(
@@ -54,6 +55,56 @@ class MarketDataSyncServiceImplTest {
         assertThat(prices.getValue()).extracting(MarketPriceDaily::tradeDate)
                 .containsExactly(LocalDate.of(2026, 7, 24));
         verify(provider, never()).fetchDailyPrices(eq(20L), any(), any(), any());
+    }
+
+    @Test
+    void backfillsFullWindowWhenSeedDataHasInsufficientHistory() throws Exception {
+        Clock clock = Clock.fixed(
+                Instant.parse("2026-07-30T00:00:00Z"),
+                ZoneId.of("Asia/Shanghai")
+        );
+        MarketDataSyncServiceImpl service = service(clock);
+        Stock aapl = stock(1L, "AAPL", "STOCK");
+        when(stockRepository.findAll()).thenReturn(List.of(aapl));
+        when(marketPriceRepository.findFirstTradeDate(1L))
+                .thenReturn(Optional.of(LocalDate.of(2026, 7, 20)));
+        when(marketPriceRepository.findLastTradeDate(1L))
+                .thenReturn(Optional.of(LocalDate.of(2026, 7, 29)));
+        when(provider.fetchDailyPrices(any(), any(), any(), any())).thenReturn(List.of());
+
+        service.syncAll();
+
+        verify(provider).fetchDailyPrices(
+                1L,
+                "AAPL",
+                LocalDate.of(2021, 7, 29),
+                LocalDate.of(2026, 7, 29)
+        );
+    }
+
+    @Test
+    void usesOverlapWindowWhenConfiguredHistoryIsAlreadyCovered() throws Exception {
+        Clock clock = Clock.fixed(
+                Instant.parse("2026-07-30T00:00:00Z"),
+                ZoneId.of("Asia/Shanghai")
+        );
+        MarketDataSyncServiceImpl service = service(clock);
+        Stock aapl = stock(1L, "AAPL", "STOCK");
+        when(stockRepository.findAll()).thenReturn(List.of(aapl));
+        when(marketPriceRepository.findFirstTradeDate(1L))
+                .thenReturn(Optional.of(LocalDate.of(2021, 8, 3)));
+        when(marketPriceRepository.findLastTradeDate(1L))
+                .thenReturn(Optional.of(LocalDate.of(2026, 7, 29)));
+        when(provider.fetchDailyPrices(any(), any(), any(), any())).thenReturn(List.of());
+
+        service.syncAll();
+
+        verify(provider).fetchDailyPrices(
+                1L,
+                "AAPL",
+                LocalDate.of(2026, 7, 19),
+                LocalDate.of(2026, 7, 29)
+        );
     }
 
     @Test
@@ -81,7 +132,7 @@ class MarketDataSyncServiceImplTest {
                 clock,
                 "America/New_York",
                 "18:30",
-                18,
+                60,
                 10
         );
     }

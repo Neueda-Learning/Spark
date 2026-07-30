@@ -68,9 +68,18 @@ public class MarketDataSyncServiceImpl implements MarketDataSyncService {
                 continue;
             }
             processed++;
-            LocalDate startDate = marketPriceRepository.findLastTradeDate(stock.id())
-                    .map(date -> date.minusDays(overlapDays))
-                    .orElseGet(() -> lastAllowedDate.minusMonths(backfillMonths));
+            LocalDate backfillStartDate = lastAllowedDate.minusMonths(backfillMonths);
+            LocalDate coverageCutoff = backfillStartDate.plusDays(overlapDays);
+            LocalDate firstTradeDate = marketPriceRepository.findFirstTradeDate(stock.id())
+                    .orElse(null);
+            LocalDate startDate;
+            if (firstTradeDate == null || firstTradeDate.isAfter(coverageCutoff)) {
+                startDate = backfillStartDate;
+            } else {
+                startDate = marketPriceRepository.findLastTradeDate(stock.id())
+                        .map(date -> date.minusDays(overlapDays))
+                        .orElse(backfillStartDate);
+            }
 
             try {
                 List<MarketPriceDaily> fetched = fetchWithRetry(

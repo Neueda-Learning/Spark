@@ -92,9 +92,18 @@ public class JdbcMarketPriceRepository implements MarketPriceRepository {
     }
 
     @Override
+    public Optional<LocalDate> findFirstTradeDate(Long stockId) {
+        return findBoundaryTradeDate(stockId, "MIN");
+    }
+
+    @Override
     public Optional<LocalDate> findLastTradeDate(Long stockId) {
+        return findBoundaryTradeDate(stockId, "MAX");
+    }
+
+    private Optional<LocalDate> findBoundaryTradeDate(Long stockId, String aggregate) {
         return jdbc.query(
-                        "SELECT MAX(trade_date) FROM market_price_daily WHERE stock_id = ?",
+                        "SELECT " + aggregate + "(trade_date) FROM market_price_daily WHERE stock_id = ?",
                         (rs, rowNum) -> {
                             Date date = rs.getDate(1);
                             return date == null ? null : date.toLocalDate();
