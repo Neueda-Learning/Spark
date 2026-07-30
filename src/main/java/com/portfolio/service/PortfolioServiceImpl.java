@@ -450,4 +450,36 @@ public class PortfolioServiceImpl implements PortfolioService {
 
     private record PositionState(BigDecimal quantity, BigDecimal averageCost) {
     }
+
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public DepositResponse deposit(Long portfolioId, BigDecimal amount) {
+        // 1. 校验金额
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Deposit amount must be positive");
+        }
+
+        // 2. 获取当前余额
+        Portfolio portfolio = portfolioRepository.findById(portfolioId)
+                .orElseThrow(() -> new IllegalArgumentException("Portfolio not found: " + portfolioId));
+        BigDecimal previousBalance = portfolio.cashBalance();
+
+        // 3. 计算新余额并更新
+        BigDecimal newBalance = previousBalance.add(amount).setScale(2, RoundingMode.HALF_UP);
+        portfolioRepository.updateCashBalance(portfolioId, newBalance);
+
+        log.info("Deposit: portfolioId={}, amount={}, previous={}, new={}",
+                portfolioId, amount, previousBalance, newBalance);
+
+        // 4. 返回结果
+        return new DepositResponse(
+                true,
+                "Deposit successful",
+                previousBalance.setScale(2, RoundingMode.HALF_UP),
+                amount.setScale(2, RoundingMode.HALF_UP),
+                newBalance,
+                LocalDateTime.now()
+        );
+    }
+
 }
