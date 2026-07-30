@@ -44,4 +44,14 @@ public class PortfolioController {
     public List<HoldingResponse> getHoldings() {
         return portfolioService.getHoldings(DEFAULT_PORTFOLIO_ID);
     }
+
+    /**
+     * POST /api/portfolio/deposit — 银行充值
+     * 将指定金额存入组合现金余额
+     */
+    @PostMapping("/deposit")
+    public DepositResponse deposit(@RequestBody DepositRequest request) {
+        return portfolioService.deposit(DEFAULT_PORTFOLIO_ID, request.amount());
+    }
+
 }

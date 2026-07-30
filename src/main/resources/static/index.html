@@ -270,6 +270,60 @@
             margin-top: 6px;
         }
 
+
+        /* ===== Deposit Area ===== */
+        .deposit-bar {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,250,252,.9));
+            border-radius: 16px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(148,163,184,.16);
+            padding: 16px 24px;
+            margin-bottom: 20px;
+        }
+        .deposit-bar .deposit-label {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1e293b;
+            white-space: nowrap;
+        }
+        .deposit-bar input[type="number"] {
+            width: 160px;
+            padding: 8px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 15px;
+            outline: none;
+            transition: border-color .2s;
+        }
+        .deposit-bar input[type="number"]:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+        }
+        .deposit-bar .btn-deposit {
+            padding: 8px 20px;
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background .2s;
+        }
+        .deposit-bar .btn-deposit:hover {
+            background: #1d4ed8;
+        }
+        .deposit-bar .deposit-msg {
+            font-size: 13px;
+            margin-left: auto;
+            white-space: nowrap;
+        }
+        .deposit-msg.success { color: #10b981; }
+        .deposit-msg.error { color: #ef4444; }
+
         /* ===== Chart Row ===== */
         .chart-row {
             display: grid;
@@ -814,6 +868,14 @@
 
     <!-- Tab 2: Investment Operations -->
     <div id="tab-operations" class="tab-content">
+        <!-- Bank Deposit Bar -->
+        <div class="deposit-bar">
+            <span class="deposit-label">💰 Bank Deposit</span>
+            <input type="number" id="deposit-amount" placeholder="Enter amount" min="0.01" step="0.01">
+            <button class="btn-deposit" onclick="handleDeposit()">Deposit</button>
+            <span class="deposit-msg" id="deposit-msg"></span>
+        </div>
+
         <!-- Holdings -->
         <div class="card">
             <div class="card-title">My Holdings</div>
@@ -2342,6 +2404,46 @@ function buildForecastChart(ctx, currentForecast, recommendedForecast, locale) {
         }
     });
 }
+
+/* ================================================================
+   Bank Deposit
+   ================================================================ */
+async function handleDeposit() {
+    const input = document.getElementById('deposit-amount');
+    const msgEl = document.getElementById('deposit-msg');
+    const amount = parseFloat(input.value);
+
+    if (!amount || amount <= 0) {
+        msgEl.textContent = 'Please enter a valid amount';
+        msgEl.className = 'deposit-msg error';
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/portfolio/deposit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: amount })
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || 'Deposit failed');
+        }
+
+        const data = await res.json();
+        msgEl.textContent = `✅ Deposited $${data.depositAmount.toLocaleString()} → New balance: $${data.newBalance.toLocaleString()}`;
+        msgEl.className = 'deposit-msg success';
+        input.value = '';
+
+        // 刷新 overview 数据
+        await loadOverview(true);
+    } catch (e) {
+        msgEl.textContent = '❌ ' + e.message;
+        msgEl.className = 'deposit-msg error';
+    }
+}
+
 </script>
 </body>
 </html>
