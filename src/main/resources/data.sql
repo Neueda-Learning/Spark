@@ -1,163 +1,119 @@
--- Seed 20 investment items (14 stocks + 4 bonds + 2 cash equivalents)
--- Using INSERT IGNORE to avoid duplicate key errors on restart
+-- Spark Portfolio Manager - unified seed data
+-- Source of the OHLCV rows: the current project's market_price_daily table.
+-- Those rows were fetched by the existing Yahoo provider and have source=YAHOO.
+-- Snapshot copied on 2026-07-30; market dates cover 2026-07-20..2026-07-29.
 
--- STOCKS (14)
-INSERT IGNORE INTO stock (symbol, name, asset_type, sector, exchange, currency) VALUES
-('AAPL',  'Apple Inc.',           'STOCK', 'Technology',      'NASDAQ', 'USD'),
-('MSFT',  'Microsoft Corp.',      'STOCK', 'Technology',      'NASDAQ', 'USD'),
-('GOOGL', 'Alphabet Inc.',        'STOCK', 'Technology',      'NASDAQ', 'USD'),
-('AMZN',  'Amazon.com Inc.',      'STOCK', 'Consumer',        'NASDAQ', 'USD'),
-('NVDA',  'NVIDIA Corp.',         'STOCK', 'Technology',      'NASDAQ', 'USD'),
-('TSLA',  'Tesla Inc.',           'STOCK', 'Automotive',      'NASDAQ', 'USD'),
-('META',  'Meta Platforms Inc.',  'STOCK', 'Technology',      'NASDAQ', 'USD'),
-('JPM',   'JPMorgan Chase & Co.', 'STOCK', 'Finance',         'NYSE',   'USD'),
-('JNJ',   'Johnson & Johnson',    'STOCK', 'Healthcare',      'NYSE',   'USD'),
-('V',     'Visa Inc.',            'STOCK', 'Finance',         'NYSE',   'USD'),
-('PG',    'Procter & Gamble Co.', 'STOCK', 'Consumer',        'NYSE',   'USD'),
-('XOM',   'Exxon Mobil Corp.',    'STOCK', 'Energy',          'NYSE',   'USD'),
-('UNH',   'UnitedHealth Group',   'STOCK', 'Healthcare',      'NYSE',   'USD'),
-('MA',    'Mastercard Inc.',      'STOCK', 'Finance',         'NYSE',   'USD');
+-- Keep the full instrument catalogue available to the investment page.
+INSERT IGNORE INTO stock
+    (symbol, name, asset_type, sector, exchange, currency)
+VALUES
+    ('AAPL', 'Apple Inc.', 'STOCK', 'Technology', 'NASDAQ', 'USD'),
+    ('MSFT', 'Microsoft Corp.', 'STOCK', 'Technology', 'NASDAQ', 'USD'),
+    ('GOOGL', 'Alphabet Inc.', 'STOCK', 'Technology', 'NASDAQ', 'USD'),
+    ('AMZN', 'Amazon.com Inc.', 'STOCK', 'Consumer', 'NASDAQ', 'USD'),
+    ('NVDA', 'NVIDIA Corp.', 'STOCK', 'Technology', 'NASDAQ', 'USD'),
+    ('TSLA', 'Tesla Inc.', 'STOCK', 'Automotive', 'NASDAQ', 'USD'),
+    ('META', 'Meta Platforms Inc.', 'STOCK', 'Technology', 'NASDAQ', 'USD'),
+    ('JPM', 'JPMorgan Chase & Co.', 'STOCK', 'Finance', 'NYSE', 'USD'),
+    ('JNJ', 'Johnson & Johnson', 'STOCK', 'Healthcare', 'NYSE', 'USD'),
+    ('V', 'Visa Inc.', 'STOCK', 'Finance', 'NYSE', 'USD'),
+    ('PG', 'Procter & Gamble Co.', 'STOCK', 'Consumer', 'NYSE', 'USD'),
+    ('XOM', 'Exxon Mobil Corp.', 'STOCK', 'Energy', 'NYSE', 'USD'),
+    ('UNH', 'UnitedHealth Group', 'STOCK', 'Healthcare', 'NYSE', 'USD'),
+    ('MA', 'Mastercard Inc.', 'STOCK', 'Finance', 'NYSE', 'USD'),
+    ('AGG', 'iShares Core US Aggregate Bond ETF', 'BOND', 'Fixed Income', 'NYSE', 'USD'),
+    ('BND', 'Vanguard Total Bond Market ETF', 'BOND', 'Fixed Income', 'NASDAQ', 'USD'),
+    ('TLT', 'iShares 20+ Year Treasury Bond ETF', 'BOND', 'Fixed Income', 'NASDAQ', 'USD'),
+    ('LQD', 'iShares iBoxx Investment Grade Corp Bond ETF', 'BOND', 'Fixed Income', 'NYSE', 'USD'),
+    ('USD', 'US Dollar', 'CASH', 'Cash', 'FOREX', 'USD'),
+    ('USDMONEY', 'US Money Market Fund', 'CASH', 'Cash', 'FUND', 'USD');
 
--- BONDS (4)
-INSERT IGNORE INTO stock (symbol, name, asset_type, sector, exchange, currency) VALUES
-('AGG',  'iShares Core US Aggregate Bond ETF', 'BOND', 'Fixed Income', 'NYSE', 'USD'),
-('BND',  'Vanguard Total Bond Market ETF',     'BOND', 'Fixed Income', 'NASDAQ', 'USD'),
-('TLT',  'iShares 20+ Year Treasury Bond ETF', 'BOND', 'Fixed Income', 'NASDAQ', 'USD'),
-('LQD',  'iShares iBoxx Investment Grade Corp Bond ETF', 'BOND', 'Fixed Income', 'NYSE', 'USD');
+-- The three buys use the 2026-07-20 Yahoo close as their unit cost.
+-- 10 * 326.5900 + 8 * 402.2900 + 20 * 203.2800 = 10,549.82.
+INSERT IGNORE INTO portfolio (id, name, cash_balance)
+VALUES (1, 'My Portfolio', 89450.18);
 
--- CASH EQUIVALENTS (2)
-INSERT IGNORE INTO stock (symbol, name, asset_type, sector, exchange, currency) VALUES
-('USD',    'US Dollar',              'CASH', 'Cash', 'FOREX', 'USD'),
-('USDMONEY', 'US Money Market Fund', 'CASH', 'Cash', 'FUND',  'USD');
+INSERT IGNORE INTO holding
+    (id, portfolio_id, stock_id, quantity, average_cost)
+VALUES
+    (1001, 1, (SELECT id FROM stock WHERE symbol = 'AAPL'), 10.0000, 326.5900),
+    (1002, 1, (SELECT id FROM stock WHERE symbol = 'MSFT'), 8.0000, 402.2900),
+    (1003, 1, (SELECT id FROM stock WHERE symbol = 'NVDA'), 20.0000, 203.2800);
 
--- Default portfolio with $100,000 initial cash
-INSERT IGNORE INTO portfolio (id, name, cash_balance) VALUES
+-- Fixed ids make repeated Spring data.sql execution idempotent.
+INSERT IGNORE INTO transaction
+    (id, portfolio_id, stock_id, type, quantity, unit_price, total_amount, created_at)
+VALUES
+    (1001, 1, (SELECT id FROM stock WHERE symbol = 'AAPL'),
+        'BUY', 10.0000, 326.5900, 3265.90, '2026-07-20 16:05:00'),
+    (1002, 1, (SELECT id FROM stock WHERE symbol = 'MSFT'),
+        'BUY', 8.0000, 402.2900, 3218.32, '2026-07-20 16:06:00'),
+    (1003, 1, (SELECT id FROM stock WHERE symbol = 'NVDA'),
+        'BUY', 20.0000, 203.2800, 4065.60, '2026-07-20 16:07:00');
 
-(1, 'My Portfolio', 100000.00);
+-- Eight common market dates are included. The service selects the latest seven:
+-- 2026-07-21, 07-22, 07-23, 07-24, 07-27, 07-28, and 07-29.
+INSERT INTO market_price_daily
+(stock_id, trade_date, open_price, high_price, low_price, close_price,
+ adjusted_close, volume, source, fetched_at)
+VALUES
+    ((SELECT id FROM stock WHERE symbol = 'AAPL'), '2026-07-20',
+     333.510010, 333.709991, 323.679993, 326.589996, 326.589996, 53468000, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'MSFT'), '2026-07-20',
+     391.410004, 403.179993, 389.649994, 402.290009, 402.290009, 27915800, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'NVDA'), '2026-07-20',
+     205.869995, 207.740005, 202.279999, 203.279999, 203.279999, 88701500, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'AAPL'), '2026-07-21',
+     323.130005, 329.600006, 322.220001, 327.739990, 327.739990, 41338900, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'MSFT'), '2026-07-21',
+     398.809998, 401.470001, 396.320007, 397.750000, 397.750000, 24126600, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'NVDA'), '2026-07-21',
+     207.539993, 208.649994, 204.009995, 207.289993, 207.289993, 108685600, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'AAPL'), '2026-07-22',
+     327.869995, 329.000000, 323.339996, 325.890015, 325.890015, 38755900, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'MSFT'), '2026-07-22',
+     399.579987, 401.000000, 386.959991, 390.339996, 390.339996, 28142500, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'NVDA'), '2026-07-22',
+     205.809998, 214.389999, 204.949997, 212.059998, 212.059998, 137645600, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'AAPL'), '2026-07-23',
+     321.730011, 323.299988, 319.350006, 321.660004, 321.660004, 40840800, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'MSFT'), '2026-07-23',
+     389.970001, 391.779999, 377.390015, 381.579987, 381.579987, 30351800, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'NVDA'), '2026-07-23',
+     209.460007, 210.869995, 205.960007, 208.759995, 208.759995, 110505300, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'AAPL'), '2026-07-24',
+     321.790009, 334.369995, 321.619995, 333.019989, 333.019989, 47489400, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'MSFT'), '2026-07-24',
+     387.049988, 389.029999, 380.649994, 381.700012, 381.700012, 27659400, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'NVDA'), '2026-07-24',
+     207.449997, 211.910004, 204.809998, 206.839996, 206.839996, 114836800, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'AAPL'), '2026-07-27',
+     334.540009, 339.570007, 334.019989, 336.910004, 336.910004, 49604300, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'MSFT'), '2026-07-27',
+     390.079987, 394.200012, 387.989990, 389.100006, 389.100006, 27856200, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'NVDA'), '2026-07-27',
+     208.199997, 208.750000, 195.440002, 196.509995, 196.509995, 154353700, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'AAPL'), '2026-07-28',
+     340.029999, 342.890015, 335.600006, 340.079987, 340.079987, 51859000, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'MSFT'), '2026-07-28',
+     393.160004, 400.320007, 391.299988, 393.350006, 393.350006, 32367500, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'NVDA'), '2026-07-28',
+     195.000000, 198.699997, 192.740005, 197.009995, 197.009995, 134111500, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'AAPL'), '2026-07-29',
+     339.690002, 344.569885, 337.350098, 338.190002, 338.190002, 48852885, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'MSFT'), '2026-07-29',
+     393.399994, 401.250000, 388.743011, 390.540009, 390.540009, 42418496, 'YAHOO', CURRENT_TIMESTAMP),
+    ((SELECT id FROM stock WHERE symbol = 'NVDA'), '2026-07-29',
+     195.845001, 197.074005, 190.009995, 190.009995, 190.009995, 136609393, 'YAHOO', CURRENT_TIMESTAMP)
+    ON DUPLICATE KEY UPDATE
+                         open_price = VALUES(open_price),
+                         high_price = VALUES(high_price),
+                         low_price = VALUES(low_price),
+                         close_price = VALUES(close_price),
+                         adjusted_close = VALUES(adjusted_close),
+                         volume = VALUES(volume),
+                         source = VALUES(source),
+                         fetched_at = VALUES(fetched_at);
 
--- Align the default portfolio cash with the seeded positions on first startup.
-UPDATE portfolio
-SET cash_balance = 91830.00
-WHERE id = 1 AND cash_balance = 100000.00;
-
--- Seed a small live portfolio so overview, holdings, and weekly performance are not empty.
-INSERT IGNORE INTO holding (id, portfolio_id, stock_id, quantity, average_cost) VALUES
-(1001, 1, (SELECT id FROM stock WHERE symbol = 'AAPL'), 15.0000, 190.0000),
-(1002, 1, (SELECT id FROM stock WHERE symbol = 'MSFT'), 8.0000, 415.0000),
-(1003, 1, (SELECT id FROM stock WHERE symbol = 'AGG'), 20.0000, 100.0000);
-
--- Seed matching trade history. Fixed ids keep this block idempotent across restarts.
-INSERT IGNORE INTO transaction (id, portfolio_id, stock_id, type, quantity, unit_price, total_amount, created_at) VALUES
-(1001, 1, (SELECT id FROM stock WHERE symbol = 'AAPL'), 'BUY', 15.0000, 190.0000, 2850.00, '2026-07-18 09:35:00'),
-(1002, 1, (SELECT id FROM stock WHERE symbol = 'MSFT'), 'BUY', 8.0000, 415.0000, 3320.00, '2026-07-19 10:10:00'),
-(1003, 1, (SELECT id FROM stock WHERE symbol = 'AGG'), 'BUY', 20.0000, 100.0000, 2000.00, '2026-07-23 14:20:00');
-
-
--- ============================================
--- Dividend History (2025 Q3 ~ 2026 Q3)
--- ============================================
-
--- AAPL: $0.25/share quarterly
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('AAPL', '2025-08-08', '2025-08-14', 0.2500, 'quarterly'),
-('AAPL', '2025-11-07', '2025-11-13', 0.2500, 'quarterly'),
-('AAPL', '2026-02-06', '2026-02-12', 0.2500, 'quarterly'),
-('AAPL', '2026-05-08', '2026-05-14', 0.2500, 'quarterly');
-
--- MSFT: $0.75/share quarterly
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('MSFT', '2025-08-14', '2025-09-04', 0.7500, 'quarterly'),
-('MSFT', '2025-11-20', '2025-12-11', 0.7500, 'quarterly'),
-('MSFT', '2026-02-19', '2026-03-12', 0.7500, 'quarterly'),
-('MSFT', '2026-05-14', '2026-06-11', 0.7500, 'quarterly');
-
--- NVDA: $0.01/share quarterly
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('NVDA', '2025-09-05', '2025-09-12', 0.0100, 'quarterly'),
-('NVDA', '2025-12-05', '2025-12-12', 0.0100, 'quarterly'),
-('NVDA', '2026-03-06', '2026-03-13', 0.0100, 'quarterly'),
-('NVDA', '2026-06-12', '2026-06-19', 0.0100, 'quarterly');
-
--- META: $0.50/share quarterly
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('META', '2025-09-15', '2025-09-25', 0.5000, 'quarterly'),
-('META', '2025-12-15', '2026-01-09', 0.5000, 'quarterly'),
-('META', '2026-03-15', '2026-03-26', 0.5000, 'quarterly'),
-('META', '2026-06-15', '2026-06-26', 0.5000, 'quarterly');
-
--- JPM: $1.05/share quarterly
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('JPM', '2025-09-04', '2025-10-01', 1.0500, 'quarterly'),
-('JPM', '2025-12-04', '2026-01-02', 1.0500, 'quarterly'),
-('JPM', '2026-03-05', '2026-04-01', 1.0500, 'quarterly'),
-('JPM', '2026-06-05', '2026-07-01', 1.0500, 'quarterly');
-
--- JNJ: $1.24/share quarterly
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('JNJ', '2025-08-25', '2025-09-09', 1.2400, 'quarterly'),
-('JNJ', '2025-11-24', '2025-12-09', 1.2400, 'quarterly'),
-('JNJ', '2026-02-23', '2026-03-10', 1.2400, 'quarterly'),
-('JNJ', '2026-05-25', '2026-06-09', 1.2400, 'quarterly');
-
--- V: $0.56/share quarterly
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('V', '2025-09-04', '2025-10-01', 0.5600, 'quarterly'),
-('V', '2025-12-04', '2026-01-02', 0.5600, 'quarterly'),
-('V', '2026-03-05', '2026-04-01', 0.5600, 'quarterly'),
-('V', '2026-06-04', '2026-07-01', 0.5600, 'quarterly');
-
--- PG: $1.0175/share quarterly
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('PG', '2025-10-23', '2025-11-17', 1.0175, 'quarterly'),
-('PG', '2026-01-22', '2026-02-15', 1.0175, 'quarterly'),
-('PG', '2026-04-20', '2026-05-15', 1.0175, 'quarterly'),
-('PG', '2026-07-23', '2026-08-15', 1.0175, 'quarterly');
-
--- XOM: $0.95/share quarterly
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('XOM', '2025-08-14', '2025-09-10', 0.9500, 'quarterly'),
-('XOM', '2025-11-13', '2025-12-10', 0.9500, 'quarterly'),
-('XOM', '2026-02-12', '2026-03-10', 0.9500, 'quarterly'),
-('XOM', '2026-05-14', '2026-06-10', 0.9500, 'quarterly');
-
--- UNH: $2.00/share quarterly
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('UNH', '2025-09-05', '2025-09-30', 2.0000, 'quarterly'),
-('UNH', '2025-12-05', '2025-12-30', 2.0000, 'quarterly'),
-('UNH', '2026-03-06', '2026-03-30', 2.0000, 'quarterly'),
-('UNH', '2026-06-05', '2026-06-30', 2.0000, 'quarterly');
-
--- MA: $0.77/share quarterly
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('MA', '2025-08-07', '2025-08-20', 0.7700, 'quarterly'),
-('MA', '2025-11-06', '2025-11-20', 0.7700, 'quarterly'),
-('MA', '2026-02-05', '2026-02-20', 0.7700, 'quarterly'),
-('MA', '2026-05-07', '2026-05-20', 0.7700, 'quarterly');
-
--- AGG: $0.93/share quarterly (bond ETF)
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('AGG', '2025-09-03', '2025-09-10', 0.9300, 'quarterly'),
-('AGG', '2025-12-03', '2025-12-10', 0.9300, 'quarterly'),
-('AGG', '2026-03-04', '2026-03-11', 0.9300, 'quarterly'),
-('AGG', '2026-06-03', '2026-06-10', 0.9300, 'quarterly');
-
--- BND: $0.44/share quarterly (bond ETF)
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('BND', '2025-09-04', '2025-09-10', 0.4400, 'quarterly'),
-('BND', '2025-12-04', '2025-12-10', 0.4400, 'quarterly'),
-('BND', '2026-03-05', '2026-03-11', 0.4400, 'quarterly'),
-('BND', '2026-06-04', '2026-06-10', 0.4400, 'quarterly');
-
--- TLT: $0.66/share quarterly (bond ETF)
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('TLT', '2025-09-02', '2025-09-08', 0.6600, 'quarterly'),
-('TLT', '2025-12-02', '2025-12-08', 0.6600, 'quarterly'),
-('TLT', '2026-03-03', '2026-03-09', 0.6600, 'quarterly'),
-('TLT', '2026-06-02', '2026-06-08', 0.6600, 'quarterly');
-
--- LQD: $0.65/share quarterly (bond ETF)
-INSERT IGNORE INTO dividend_history (symbol, ex_date, pay_date, dividend_per_share, frequency) VALUES
-('LQD', '2025-09-03', '2025-09-10', 0.6500, 'quarterly'),
-('LQD', '2025-12-03', '2025-12-10', 0.6500, 'quarterly'),
-('LQD', '2026-03-04', '2026-03-11', 0.6500, 'quarterly'),
-('LQD', '2026-06-03', '2026-06-10', 0.6500, 'quarterly');
+-- portfolio_performance_cache and user_dividend are derived data. Leave them
+-- empty so the application builds them from transactions and market prices.

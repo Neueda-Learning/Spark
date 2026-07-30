@@ -40,11 +40,14 @@ mvn spring-boot:run
 首次运行前请先确保 MySQL 可用，并通过环境或本地配置提供数据库连接信息。
 日行情表由 `src/main/resources/schema.sql` 自动创建。
 
-首次历史回填默认关闭。如需在本次启动时回填最近 18 个月行情：
+首次历史回填默认开启。新库或历史覆盖不足时会补齐最近 60 个月行情；已有完整
+历史时只同步最近 10 天的重叠区间。
+
+如需临时关闭启动回填：
 
 ```bash
 mvn spring-boot:run \
-  -Dspring-boot.run.arguments=--market-data.backfill-on-startup=true
+  -Dspring-boot.run.arguments=--market-data.backfill-on-startup=false
 ```
 
 回填过程按股票隔离失败，并通过 `(stock_id, trade_date)` 唯一键幂等更新。

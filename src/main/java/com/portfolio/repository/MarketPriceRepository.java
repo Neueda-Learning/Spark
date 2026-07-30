@@ -14,6 +14,8 @@ public interface MarketPriceRepository {
 
     void upsertAll(List<MarketPriceDaily> prices);
 
+    Optional<LocalDate> findFirstTradeDate(Long stockId);
+
     Optional<LocalDate> findLastTradeDate(Long stockId);
 
     Optional<MarketPriceDaily> findLatestByStockId(Long stockId);
