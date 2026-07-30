@@ -10,9 +10,9 @@ import java.time.LocalDate;
 public record DividendHistory(
         Long id,
         String symbol,
-        LocalDate exDate,       // 除息日：判断是否持有的截止日
-        LocalDate payDate,      // 派息日：分红到账日
-        BigDecimal dividendPerShare,  // 每股税前分红金额
+        LocalDate exDate,       // Ex-dividend date used to determine eligible holdings.
+        LocalDate payDate,      // Payment date when the dividend is credited.
+        BigDecimal dividendPerShare,  // Gross dividend amount per share before tax.
         String frequency,        // quarterly / semi-annual / annual
-        LocalDate createdAt      // 记录创建时间
+        LocalDate createdAt      // Record creation date.
 ) {}

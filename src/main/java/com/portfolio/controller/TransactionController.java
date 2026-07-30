@@ -23,12 +23,12 @@ public class TransactionController {
     }
 
     /**
-     * POST /api/portfolio/transactions — 买入/卖出操作
-     * 请求体: { "stockId": 1, "type": "BUY", "quantity": 10 }
-     * 
-     * 验证规则：
-     * - BUY: 总价 ≤ 当前现金余额
-     * - SELL: 卖出数量 ≤ 持有数量
+     * POST /api/portfolio/transactions - buy or sell operation.
+     * Request body: { "stockId": 1, "type": "BUY", "quantity": 10 }
+     *
+     * Validation rules:
+     * - BUY: total cost must not exceed the current cash balance.
+     * - SELL: sell quantity must not exceed the held quantity.
      */
     @PostMapping("/transactions")
     public ResponseEntity<TransactionResponse> executeTransaction(

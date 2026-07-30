@@ -1,103 +1,103 @@
-# Yahoo 金融数据入库与多周期 K 线功能改动方案
+# Yahoo Market Data Ingestion and Multi-Interval Candlestick Plan
 
-## 1. 文档信息
+## 1. Document Info
 
-- 项目：Portfolio Manager
-- 文档状态：已实施，持续增强
-- 适用版本：V1 后续增量版本
-- 编写日期：2026-07-27
-- 最近更新：2026-07-28
-- 本文档描述设计、已实施范围和后续增强决策
+- Project: Portfolio Manager
+- Status: Implemented, with ongoing enhancements
+- Applicable version: Post-V1 incremental releases
+- Created: 2026-07-27
+- Last updated: 2026-07-28
+- This document describes the design, implemented scope, and follow-up enhancement decisions.
 
-## 2. 背景
+## 2. Background
 
-当前 V1 已实现：
+The current V1 already provides:
 
-- Spring Boot REST API；
-- MySQL 持久化；
-- 默认投资组合、持仓和买卖交易；
-- 组合总览、资产分配和投资操作页面；
-- 基于 `SimulatedPriceService` 的确定性模拟行情；
+- Spring Boot REST APIs
+- MySQL persistence
+- A default portfolio, holdings, and buy/sell transactions
+- Portfolio overview, asset allocation, and trading pages
+- Deterministic simulated prices via `SimulatedPriceService`
 
-当前行情存在以下限制：
+The current pricing flow still has these limitations:
 
-- 股票价格由代码本地生成，不是真实金融数据；
-- 价格没有独立的历史行情表；
-- 页面请求价格时依赖运行时计算，无法反映真实交易日；
-- 无法形成可靠的日线、周线等历史行情；
-- `YahooFinanceAPI` 依赖已经存在，但尚未在业务代码中使用。
+- Stock prices are generated locally in code instead of using real financial data.
+- There is no independent historical market data table.
+- Price reads depend on runtime calculation and cannot reflect actual trading days.
+- Reliable daily, weekly, and monthly price history cannot be produced.
+- The `YahooFinanceAPI` dependency already exists, but is not yet used by business code.
 
-本次增量希望在保留 V1 组合与交易能力的基础上，引入 Yahoo Finance 历史行情，并在投资操作页面中展示日、周、月三个周期的股票 K 线。
+This increment keeps the existing V1 portfolio and trading capabilities, adds Yahoo Finance historical data, and shows daily, weekly, and monthly candlestick charts on the trading page.
 
-## 3. 建设目标
+## 3. Objectives
 
-### 3.1 功能目标
+### 3.1 Functional Goals
 
-1. 从 Yahoo Finance 获取真实的每日盘后 OHLCV 数据。
-2. 将日行情保存到 MySQL，并支持重复执行和数据修正。
-3. 在应用首次接入时回填一段历史日线数据。
-4. 在美股盘后定期同步最新日行情。
-5. 组合估值、持仓盈亏和交易参考价从数据库最新收盘价读取。
-6. 提供按股票查询日、周、月 K 线的统一 REST API。
-7. 用户点击投资操作页面中的某只股票时，弹出 K 线图，默认显示日线并支持周期切换。
-8. 鼠标悬浮在某根 K 线上时显示该周期的 OHLC、复权收盘价、涨跌幅和成交量。
-9. Yahoo 暂时不可用时，已有历史行情和页面仍然可访问。
+1. Fetch real post-close daily OHLCV data from Yahoo Finance.
+2. Save daily prices to MySQL with repeatable execution and correction support.
+3. Backfill a historical daily price range when the application is first connected.
+4. Periodically sync the latest daily prices after the US market close.
+5. Read portfolio valuation, holding P&L, and trade reference prices from the latest database close.
+6. Provide a unified REST API for daily, weekly, and monthly candles by stock.
+7. When the user clicks a stock on the trading page, open a candlestick view that defaults to daily and supports interval switching.
+8. When the mouse hovers a candle, show OHLC, adjusted close, change percent, and volume for that interval.
+9. If Yahoo is temporarily unavailable, existing historical prices and pages must remain accessible.
 
-### 3.2 非目标
+### 3.2 Non-Goals
 
-本次暂不实现：
+This increment does not include:
 
-- 分钟级或实时行情；
-- 真实券商交易；
-- 盘中成交价撮合；
-- 用户自定义行情提供商；
-- 多市场交易日历的完整支持；
-- 技术指标计算，例如 MA、MACD、RSI；
-- 多实例定时任务协调；
-- 自动处理所有分红、拆股和复权场景；
-- 重构或正式接入仓库根目录下尚未构建的 React 前端。
+- Minute-level or real-time prices
+- Real broker execution
+- Intraday matching logic
+- User-defined market data providers
+- Full multi-market trading calendar support
+- Technical indicators such as MA, MACD, and RSI
+- Scheduled-job coordination across multiple instances
+- Automatic handling for every dividend, split, and adjusted-price scenario
+- Refactoring or formally wiring in the React frontend at the repo root that is not part of the current build
 
-## 4. 核心设计原则
+## 4. Core Design Principles
 
-### 4.1 数据库是页面行情的事实来源
+### 4.1 The Database Is the Source of Truth for Frontend Prices
 
-Yahoo Finance 只由后台同步任务调用。Controller、组合估值、交易服务和前端页面均不直接调用 Yahoo。
+Yahoo Finance is called only by backend sync tasks. Controllers, portfolio valuation, trading services, and the frontend do not call Yahoo directly.
 
-这样可以：
+This approach:
 
-- 降低页面请求延迟；
-- 避免用户点击造成 Yahoo 请求突发；
-- 在 Yahoo 暂时失败时继续展示历史数据；
-- 保证组合总览、持仓列表和 K 线使用同一份价格；
-- 便于测试和后续替换行情提供商。
+- Reduces page-request latency
+- Avoids sudden Yahoo request spikes from user clicks
+- Keeps historical prices available when Yahoo is temporarily failing
+- Ensures the overview, holdings list, and candles all use the same price set
+- Makes testing and future provider replacement easier
 
-### 4.2 只持久化日线，多周期 K 线按需派生
+### 4.2 Persist Only Daily Bars, Derive Other Intervals on Demand
 
-数据库只保存每日 OHLCV。日 K 线直接映射日行情；周 K 和月 K 均由日线动态聚合，不单独持久化。
+The database stores daily OHLCV only. Daily candles map directly from daily prices. Weekly and monthly candles are aggregated dynamically from the daily series and are not stored separately.
 
-周线聚合规则：
+Weekly aggregation rules:
 
-- `open`：该周第一个交易日的开盘价；
-- `high`：该周所有交易日的最高价；
-- `low`：该周所有交易日的最低价；
-- `close`：该周最后一个交易日的收盘价；
-- `adjustedClose`：该周最后一个交易日的复权收盘价；
-- `volume`：该周成交量之和；
-- `date`：该周周一，或统一定义为该周第一个交易日。
+- `open`: the open of the first trading day of the week
+- `high`: the highest high across the week
+- `low`: the lowest low across the week
+- `close`: the close of the last trading day of the week
+- `adjustedClose`: the adjusted close of the last trading day of the week
+- `volume`: the sum of weekly volume
+- `date`: the Monday of the week, or a consistently defined first trading day of the week
 
-月线使用相同的 OHLCV 规则，按自然月分组，`date` 统一返回该月第一天。当前未结束的周和月允许展示，并通过响应顶层 `asOf` 标明数据截止日期。
+Monthly candles follow the same OHLCV rules grouped by calendar month, and `date` returns the first day of the month. The current unfinished week or month may still be shown, with the response-level `asOf` field indicating the data cutoff date.
 
-### 4.3 Yahoo 调用必须通过可替换适配器
+### 4.3 Yahoo Access Must Go Through a Replaceable Adapter
 
-业务服务不得直接依赖 `YahooFinance.get(...)` 静态方法。新增 `MarketDataProvider` 抽象，由 `YahooMarketDataProvider` 实现。
+Business services must not depend directly on the static `YahooFinance.get(...)` method. Add a `MarketDataProvider` abstraction implemented by `YahooMarketDataProvider`.
 
-未来如果 Yahoo 不可用，可以新增其他 Provider，而无需修改数据库、调度、Controller 或前端。
+If Yahoo becomes unavailable later, another provider can be added without changing the database layer, scheduler, controllers, or frontend.
 
-### 4.4 同步必须幂等
+### 4.4 Synchronization Must Be Idempotent
 
-同一只股票、同一交易日只能有一条日行情。重复同步时更新已有数据，不插入重复记录。
+Each stock and trading day can have only one daily price record. Repeated syncs update existing rows instead of inserting duplicates.
 
-## 5. 总体架构
+## 5. Overall Architecture
 
 ```mermaid
 flowchart LR
@@ -108,102 +108,102 @@ flowchart LR
     Repository --> Database["MySQL market_price_daily"]
     Database --> DbPrice["DatabasePriceService"]
     Database --> Candle["CandleService"]
-    DbPrice --> Portfolio["组合估值、持仓和交易"]
+    DbPrice --> Portfolio["Portfolio valuation, holdings, and trading"]
     Candle --> Controller["StockController"]
-    Controller --> Frontend["投资操作页面 K 线弹窗"]
+    Controller --> Frontend["Trading page candlestick modal"]
 ```
 
-## 6. 数据库设计
+## 6. Database Design
 
-### 6.1 新增表 `market_price_daily`
+### 6.1 New Table: `market_price_daily`
 
-建议结构：
+Recommended structure:
 
-| 字段 | 类型建议 | 说明 |
+| Field | Suggested Type | Description |
 |---|---|---|
-| `id` | `BIGINT` | 自增主键 |
-| `stock_id` | `BIGINT` | 关联 `stock.id` |
-| `trade_date` | `DATE` | 交易日期 |
-| `open_price` | `DECIMAL(18,6)` | 开盘价 |
-| `high_price` | `DECIMAL(18,6)` | 最高价 |
-| `low_price` | `DECIMAL(18,6)` | 最低价 |
-| `close_price` | `DECIMAL(18,6)` | 收盘价 |
-| `adjusted_close` | `DECIMAL(18,6)` | 复权收盘价 |
-| `volume` | `BIGINT` | 成交量 |
-| `source` | `VARCHAR(20)` | 数据源，第一版为 `YAHOO` |
-| `fetched_at` | `TIMESTAMP` | 最后抓取时间 |
+| `id` | `BIGINT` | Auto-increment primary key |
+| `stock_id` | `BIGINT` | References `stock.id` |
+| `trade_date` | `DATE` | Trading date |
+| `open_price` | `DECIMAL(18,6)` | Open price |
+| `high_price` | `DECIMAL(18,6)` | High price |
+| `low_price` | `DECIMAL(18,6)` | Low price |
+| `close_price` | `DECIMAL(18,6)` | Close price |
+| `adjusted_close` | `DECIMAL(18,6)` | Adjusted close |
+| `volume` | `BIGINT` | Volume |
+| `source` | `VARCHAR(20)` | Data source, `YAHOO` in v1 |
+| `fetched_at` | `TIMESTAMP` | Last fetch time |
 
-约束与索引：
+Constraints and indexes:
 
-- 外键：`stock_id` 引用 `stock(id)`；
-- 唯一约束：`(stock_id, trade_date)`；
-- 查询索引：`(stock_id, trade_date)`；
-- 使用 `INSERT ... ON DUPLICATE KEY UPDATE` 完成幂等 upsert。
+- Foreign key: `stock_id` references `stock(id)`
+- Unique constraint: `(stock_id, trade_date)`
+- Query index: `(stock_id, trade_date)`
+- Use `INSERT ... ON DUPLICATE KEY UPDATE` for idempotent upserts
 
-### 6.2 是否修改 `stock` 表
+### 6.2 Whether `stock` Must Change
 
-第一版可以不修改 `stock` 表：
+The first version can leave the `stock` table unchanged:
 
-- 股票和债券 ETF 使用现有 `symbol` 查询 Yahoo；
-- `asset_type = 'CASH'` 的 USD、USDMONEY 不调用 Yahoo，价格固定为 1。
+- Stocks and bond ETFs use the existing `symbol` to query Yahoo.
+- `asset_type = 'CASH'` entries such as USD and USDMONEY do not call Yahoo and always keep price 1.
 
-如果后续支持国际市场，建议再增加：
+If international markets are added later, consider adding:
 
-- `provider_symbol`；
-- `price_enabled`；
-- `market_timezone`。
+- `provider_symbol`
+- `price_enabled`
+- `market_timezone`
 
-本次优先保持改动小，不提前增加未使用字段。
+For now, keep the change set small and avoid adding unused fields early.
 
-## 7. 后端设计
+## 7. Backend Design
 
-### 7.1 行情领域模型
+### 7.1 Market Data Domain Model
 
-新增：
+Add:
 
 - `model/MarketPriceDaily.java`
 
-建议字段与数据库表一致，使用 Java `record`、`LocalDate`、`BigDecimal` 和 `Instant`/`LocalDateTime`。
+Recommended fields should match the database table and use Java `record`, `LocalDate`, `BigDecimal`, and `Instant` or `LocalDateTime`.
 
 ### 7.2 Repository
 
-新增：
+Add:
 
 - `repository/MarketPriceRepository.java`
 - `repository/JdbcMarketPriceRepository.java`
 
-主要方法：
+Main responsibilities:
 
-- 批量 upsert 日行情；
-- 查询某只股票最后一个交易日；
-- 查询某只股票指定日期范围内的日行情；
-- 查询某只股票最新一条行情；
-- 查询某只股票最近两条行情；
-- 查询某只股票最近 N 个交易日。
+- Batch upsert of daily prices
+- Query the last trading day for a stock
+- Query daily prices for a stock within a date range
+- Query the latest price for a stock
+- Query the most recent two price records for a stock
+- Query the most recent N trading days for a stock
 
-网络请求不能放在长数据库事务内。建议流程为：
+Network requests must not be placed inside long-running database transactions. Recommended flow:
 
-1. 调用 Yahoo 获取数据；
-2. 完成转换和校验；
-3. 开启短事务批量写入；
-4. 提交并记录同步结果。
+1. Call Yahoo to fetch data.
+2. Transform and validate the result.
+3. Open a short transaction for batch writes.
+4. Commit and record the sync result.
 
-### 7.3 行情 Provider
+### 7.3 Market Data Provider
 
-新增：
+Add:
 
 - `service/marketdata/MarketDataProvider.java`
 - `service/marketdata/YahooMarketDataProvider.java`
 
-职责：
+Responsibilities:
 
-- 根据 symbol、开始日期和结束日期获取每日行情；
-- 将 Yahoo `HistoricalQuote` 转为内部 `MarketPriceDaily`；
-- 统一处理 Yahoo 返回的空值和异常；
-- 显式使用 `America/New_York` 转换交易日期；
-- 不包含数据库写入逻辑。
+- Fetch daily prices by symbol, start date, and end date
+- Convert Yahoo `HistoricalQuote` objects to internal `MarketPriceDaily`
+- Handle Yahoo null values and exceptions consistently
+- Explicitly convert trading dates using `America/New_York`
+- Exclude any database write logic
 
-本地依赖支持的调用能力包括：
+The existing dependency supports these calls:
 
 ```text
 YahooFinance.get(symbol, from, to, Interval.DAILY)
@@ -215,144 +215,144 @@ HistoricalQuote.getAdjClose()
 HistoricalQuote.getVolume()
 ```
 
-### 7.4 数据校验
+### 7.4 Data Validation
 
-写入数据库前至少校验：
+Before database writes, validate at minimum:
 
-- 日期、open、high、low、close 不为空；
-- OHLC 大于零；
-- `high >= max(open, close)`；
-- `low <= min(open, close)`；
-- volume 为空时按零处理，非空时不得小于零；
-- 日期不得晚于当前交易日期；
-- symbol 必须能映射到本地 `stock`。
+- date, open, high, low, and close are not null
+- OHLC values are greater than zero
+- `high >= max(open, close)`
+- `low <= min(open, close)`
+- volume is treated as zero when null and must not be negative when present
+- the date is not later than the current eligible trading date
+- the symbol can be mapped to a local `stock`
 
-无效记录跳过并写日志，不应导致其他股票同步失败。
+Invalid records should be skipped and logged without causing the sync for other stocks to fail.
 
-### 7.5 行情同步服务
+### 7.5 Market Data Sync Service
 
-新增：
+Add:
 
 - `service/MarketDataSyncService.java`
 - `service/MarketDataSyncServiceImpl.java`
 
-职责：
+Responsibilities:
 
-- 找出需要同步的非 CASH 标的；
-- 计算每只标的的同步日期范围；
-- 调用 Provider；
-- 校验并批量 upsert；
-- 按股票隔离失败；
-- 输出同步数量、跳过数量和失败原因。
+- Find non-CASH instruments that need syncing
+- Calculate the sync date range for each instrument
+- Call the provider
+- Validate and batch upsert
+- Isolate failures per stock
+- Report synced count, skipped count, and failure reasons
 
-同步策略：
+Sync strategy:
 
-- 表为空时，回填最近 12 至 18 个月日线；
-- 已有数据时，从最后行情日期向前回退 7 至 10 个自然日重新拉取；
-- 使用 upsert 覆盖 Yahoo 对最近数据的修正；
-- 只接受已经结束的常规交易日日线，不保存盘中仍在变化的当天数据；
-- 周末和休市日没有新数据属于正常结果，不生成空行情记录；
-- 一只股票失败不影响其他股票。
+- When the table is empty, backfill the most recent 12 to 18 months of daily prices
+- When data already exists, fetch again from 7 to 10 calendar days before the last known price date
+- Use upsert to apply Yahoo corrections to recent data
+- Accept only daily bars from completed regular trading days and never persist an intraday bar for the still-open current day
+- Treat weekends and market holidays with no new data as normal and do not insert placeholder rows
+- One stock failure must not affect other stocks
 
-初始默认建议回填 18 个月，以支持至少 52 根完整周 K。
+The initial recommendation is an 18-month backfill so at least 52 complete weekly candles are available.
 
-### 7.6 定时任务
+### 7.6 Scheduled Jobs
 
-新增：
+Add:
 
 - `scheduler/MarketDataScheduler.java`
 
-修改：
+Modify:
 
-- `PortfolioApplication.java` 或新增 Scheduling 配置类；
-- `application.properties` 增加非敏感调度配置。
+- `PortfolioApplication.java` or add a separate scheduling configuration class
+- `application.properties` to add non-sensitive scheduling settings
 
-#### 7.6.1 日行情完整性契约
+#### 7.6.1 Daily Price Completeness Contract
 
-本项目中的“每日行情”特指美股常规交易时段完成后的日线 OHLCV：
+In this project, a daily price means an OHLCV bar for a completed regular US market session:
 
-- 常规交易时段为 `09:30-16:00 America/New_York`；
-- 提前收盘日的常规交易时段可能在 `13:00 America/New_York` 结束；
-- 日线不包含盘前和盘后成交；
-- 数据库中的每一条 `market_price_daily` 都必须代表一个已经结束的交易日；
-- 不允许将盘中仍在变化的当天行情写成正式日线。
+- Regular session hours are `09:30-16:00 America/New_York`
+- On early-close days the regular session may end at `13:00 America/New_York`
+- Daily bars exclude pre-market and after-hours trades
+- Every `market_price_daily` row must represent a completed trading day
+- The still-changing intraday bar for the current day must never be written as a finalized daily record
 
-允许写入的最后日期按纽约时间判断：
+The latest allowed date is determined in New York time:
 
-- 纽约时间 18:30 之后执行：允许接收当天已经完成的日线；
-- 纽约时间 18:30 之前执行：最多接收到上一个已完成交易日；
-- 历史回填或应用盘中启动时，即使 Yahoo 返回当天数据，也必须丢弃尚未达到盘后截止时间的当天记录；
-- 周末和交易所休市日不写入占位记录；
-- 提前收盘日仍按正常盘后任务时间执行，因此不需要单独调整 cron。
+- Runs after 18:30 New York time may accept the completed bar for the current day
+- Runs before 18:30 New York time may only accept up to the previous completed trading day
+- During historical backfill or intraday startup, even if Yahoo returns same-day data, that record must be discarded until the post-close cutoff has passed
+- Weekends and exchange holidays do not generate placeholder rows
+- Early-close days still use the normal post-close schedule, so no special cron adjustment is required
 
-这项契约的目标是保证组合估值、交易参考价、日线和周 K 线都只依赖完整、稳定的交易日数据。
+This contract ensures portfolio valuation, trade reference prices, daily bars, and weekly candles all depend only on complete, stable trading-day data.
 
-#### 7.6.2 盘后主同步
+#### 7.6.2 Post-Close Primary Sync
 
-盘后主同步负责获取当天已经完成的日线，默认配置：
+The post-close primary sync fetches the completed bar for the current day. Recommended default configuration:
 
 ```text
 cron: 0 30 18 * * MON-FRI
 zone: America/New_York
 ```
 
-含义：每个美股工作日纽约时间 18:30 执行。
+Meaning: run at 18:30 New York time on each US trading weekday.
 
-选择收盘后 2.5 小时，而不是 16:00 后立即执行，是为了给收盘集合竞价、数据整理和 Yahoo 更新留出缓冲时间。
+The schedule is intentionally 2.5 hours after the close instead of immediately after 16:00, to leave time for closing auctions, data consolidation, and Yahoo updates.
 
-对应北京时间大致为：
+Approximate Beijing-time equivalents:
 
-- 美国夏令时：次日 06:30；
-- 美国冬令时：次日 07:30。
+- US daylight saving time: 06:30 the next day
+- US standard time: 07:30 the next day
 
-实现中必须使用 `America/New_York`，不能写死北京时间，否则夏令时切换会造成任务时间偏移。
+The implementation must use `America/New_York` explicitly. Do not hard-code Beijing time, or DST changes will shift the schedule incorrectly.
 
-#### 7.6.3 盘前补偿同步
+#### 7.6.3 Pre-Market Reconciliation Sync
 
-盘前补偿同步用于补漏和接受数据修正，不采集盘前实时行情，默认配置：
+The pre-market reconciliation sync fills gaps and accepts data corrections, but does not collect pre-market real-time quotes. Recommended default configuration:
 
 ```text
 cron: 0 0 8 * * MON-FRI
 zone: America/New_York
 ```
 
-含义：每个美股工作日纽约时间 08:00 重新同步最近 7 至 10 个自然日。
+Meaning: resync the most recent 7 to 10 calendar days at 08:00 New York time on each US trading weekday.
 
-作用：
+Purpose:
 
-- 补偿前一天 Yahoo 暂时不可用；
-- 接受 Yahoo 对上一交易日数据的修正；
-- 补偿应用停机或主任务执行失败；
-- 尽量在下一次开盘前补齐数据库。
+- Recover if Yahoo was temporarily unavailable the prior day
+- Accept corrections to the previous trading day from Yahoo
+- Recover from application downtime or primary job failure
+- Refill the database before the next market open where possible
 
-盘前补偿任务和盘后主任务调用同一个幂等同步服务。唯一约束与 upsert 保证重复执行不会产生重复行情。
+The pre-market reconciliation job and the post-close primary job both call the same idempotent sync service. The unique constraint and upsert behavior guarantee repeated execution will not create duplicate rows.
 
-#### 7.6.4 同步窗口与追赶策略
+#### 7.6.4 Sync Window and Catch-Up Strategy
 
-日常任务不只请求“今天”，而是使用重叠窗口：
+Daily jobs should not request only “today”. They should use an overlap window:
 
 ```text
-开始日期 = 数据库最后交易日 - 10 个自然日
-结束日期 = 当前允许写入的最后日期
+start date = last trading date in the database - 10 calendar days
+end date = latest allowed writable trading date
 ```
 
-这样可以在不完整实现美国交易日历的情况下处理：
+This handles the following without requiring a full US trading calendar implementation:
 
-- 周末和节假日；
-- 应用停机；
-- Yahoo 短暂失败；
-- 最近行情修正；
-- 盘后主任务遗漏。
+- weekends and holidays
+- application downtime
+- temporary Yahoo failures
+- recent data corrections
+- missed post-close sync runs
 
-首次历史回填可以在任意时间显式执行，但同样必须遵守“完整日线”过滤规则，不能保存当前尚未收盘的日线。
+The initial historical backfill may be run explicitly at any time, but it must still obey the completed-bar filter and must not save a current-day bar before the session has closed.
 
-最终数据时效约定：
+Final timeliness contract:
 
-> 正常情况下，当日完整日线应在纽约时间 18:30 的盘后主同步后入库；若主同步失败，应由下一次纽约时间 08:00 的盘前补偿同步或后续重叠窗口补齐。
+> Under normal conditions, the completed daily bar for the current day should be stored after the 18:30 New York post-close sync. If that sync fails, the next 08:00 New York reconciliation sync or a later overlap window should fill the gap.
 
-#### 7.6.5 配置项
+#### 7.6.5 Configuration Keys
 
-建议把 cron 和开关外部化：
+Externalize the cron values and switches:
 
 ```text
 market-data.sync.enabled
@@ -364,78 +364,78 @@ market-data.backfill-months
 market-data.overlap-days
 ```
 
-这些配置不包含密钥。若未来接入需要 API Key 的数据源，必须使用环境变量，不得提交到仓库。
+These settings must not include secrets. If a future provider requires an API key, it must be supplied through environment variables and must not be committed to the repository.
 
-#### 7.6.6 与 V1 时间实现的兼容性评估
+#### 7.6.6 Compatibility Evaluation with the V1 Time Model
 
-V1 当前没有定时任务，也没有显式设置 JVM、Jackson 或 MySQL 全局时区。已有时间处理包括：
+V1 currently has no scheduled jobs and does not explicitly set a global JVM, Jackson, or MySQL timezone. Existing time handling includes:
 
-- 交易流水通过 `LocalDateTime.now()` 生成 `createdAt`，语义是应用运行环境的本地时间；
-- `portfolio.created_at` 和 `transaction.created_at` 使用 MySQL `TIMESTAMP`，Repository 读取为无时区的 `LocalDateTime`；
-- 模拟行情通过服务器本地 `LocalDate.now()` 生成七日日期；
-- `portfolio_snapshot.snapshot_date` 使用 `DATE/LocalDate`，但当前没有实际生成快照的调用；
-- 异常响应使用 `Instant.now()`，输出 UTC 时间点。
+- transactions use `LocalDateTime.now()` for `createdAt`, meaning local application runtime time
+- `portfolio.created_at` and `transaction.created_at` use MySQL `TIMESTAMP` and are read back as zone-less `LocalDateTime`
+- simulated prices use server-local `LocalDate.now()` to build seven-day dates
+- `portfolio_snapshot.snapshot_date` uses `DATE/LocalDate`, but snapshot generation is not currently active
+- exception responses use `Instant.now()`, which yields a UTC instant
 
-因此，新增纽约时间不会天然与 V1 冲突，前提是纽约时区只作用于行情同步和行情业务日期，不能修改应用的全局时间环境。
+Because of that, adding New York time for market-data logic does not inherently conflict with V1, as long as New York time is scoped only to price synchronization and market business dates rather than changing the global application time environment.
 
-必须遵守以下隔离规则：
+The following isolation rules must be respected:
 
-1. `@Scheduled` 只通过注解的 `zone = "America/New_York"` 控制触发时间。
-2. 计算行情截止日期时，显式使用 `ZoneId.of("America/New_York")`。
-3. Yahoo `Calendar` 转换为交易日期时，必须显式转换到纽约市场时区后再取 `LocalDate`。
-4. `market_price_daily.trade_date` 使用 `DATE/LocalDate`，表示市场业务日期，不表示时间点。
-5. `market_price_daily.fetched_at` 建议在 Java 中使用 `Instant`，表示绝对抓取时间。
-6. 不调用 `TimeZone.setDefault(...)`。
-7. 不增加全局 `-Duser.timezone=America/New_York`。
-8. 不为了行情任务修改 `spring.jackson.time-zone` 或 MySQL 全局/session 时区。
-9. V1 的 `transaction.createdAt`、`portfolio.createdAt` 保持原有本地时间语义，不能与 `trade_date` 直接比较。
-10. 如果未来开始生成 `portfolio_snapshot`，其 `snapshot_date` 必须使用纽约市场业务日期，才能与行情日线对齐。
+1. `@Scheduled` should control trigger time only through `zone = "America/New_York"`.
+2. When calculating the price cutoff date, explicitly use `ZoneId.of("America/New_York")`.
+3. When converting a Yahoo `Calendar` to a trading date, explicitly convert to the New York market timezone before extracting `LocalDate`.
+4. `market_price_daily.trade_date` must use `DATE/LocalDate` to represent a market business date, not a timestamp.
+5. `market_price_daily.fetched_at` should preferably use `Instant` in Java to represent an absolute fetch time.
+6. Do not call `TimeZone.setDefault(...)`.
+7. Do not add a global `-Duser.timezone=America/New_York`.
+8. Do not change `spring.jackson.time-zone` or the MySQL global or session timezone for the price sync feature.
+9. Keep the V1 semantics of `transaction.createdAt` and `portfolio.createdAt` unchanged and do not compare them directly with `trade_date`.
+10. If `portfolio_snapshot` generation is added later, its `snapshot_date` must use the New York market business date to align with daily prices.
 
-推荐为行情同步逻辑注入可替换的 `Clock`，而不是直接调用系统时间。生产环境 Clock 使用纽约时区；测试环境使用固定 Clock，以验证：
+Inject a replaceable `Clock` into the market sync logic instead of calling system time directly. In production the clock should use the New York timezone. In tests use a fixed clock to verify:
 
-- 上海日期已进入下一天、纽约仍是前一天；
-- 18:30 ET 截止时间前后；
-- 美国夏令时切换；
-- 周末、休市日和提前收盘日；
-- 应用运行时区不是纽约时，调度和交易日期仍然正确。
+- Shanghai has moved to the next calendar day while New York is still on the previous one
+- behavior before and after the 18:30 ET cutoff
+- US daylight saving transitions
+- weekends, exchange holidays, and early-close days
+- when the app itself runs outside New York, scheduling and trading dates still remain correct
 
-API 中需要区分两种不同时间语义：
+The API must distinguish between two time semantics:
 
-- `priceDate`、`asOf`：纽约市场业务日期，只返回 `YYYY-MM-DD`；
-- `fetchedAt`：绝对时间点，返回带 `Z` 或 offset 的 ISO-8601 时间；
-- `transaction.createdAt`：V1 现有本地日期时间，暂不改变，但页面不应将其标注为纽约时间。
+- `priceDate`, `asOf`: New York market business date, returned as `YYYY-MM-DD`
+- `fetchedAt`: absolute timestamp, returned in ISO-8601 with `Z` or an offset
+- `transaction.createdAt`: existing V1 local datetime, unchanged for now, and the UI must not label it as New York time
 
-兼容性结论：
+Compatibility conclusion:
 
-> 采用局部纽约市场时区不会影响 V1；修改 JVM、Jackson 或数据库全局时区则可能改变现有交易时间和创建时间语义，本次实现禁止进行此类全局修改。
+> Using a scoped New York market timezone does not affect V1. Changing the global JVM, Jackson, or database timezone could alter existing transaction and creation-time semantics and is explicitly forbidden in this implementation.
 
-### 7.7 数据库价格服务
+### 7.7 Database Price Service
 
-新增：
+Add:
 
 - `service/DatabasePriceService.java`
 
-逐步替换 `SimulatedPriceService` 的生产职责：
+Gradually replace the production responsibility of `SimulatedPriceService`:
 
-- `getCurrentPrice`：返回最新交易日收盘价；
-- `getChangePercent`：比较最近两个交易日收盘价；
-- 历史价格：从 `market_price_daily` 查询。
+- `getCurrentPrice`: return the close price for the latest trading day
+- `getChangePercent`: compare the close prices of the two most recent trading days
+- historical prices: query from `market_price_daily`
 
-`SimulatedPriceService` 保留用于 demo/test profile，不允许在真实数据模式下静默回退。没有真实行情时应明确返回“行情不可用”或显示数据缺失状态，避免用户误认为模拟价格是真实价格。
+`SimulatedPriceService` should remain available only for the `demo` and `test` profiles and must not silently act as a production fallback. If real prices are unavailable, the system should explicitly return `market data unavailable` or show a missing-data state so users do not mistake simulated prices for real ones.
 
-建议为价格响应补充：
+Recommended additions to price responses:
 
-- `priceDate`；
-- `priceSource`；
-- `stale`。
+- `priceDate`
+- `priceSource`
+- `stale`
 
-交易页面应明确说明当前成交计算使用“最新可用盘后收盘价”，不是实时市场成交价。
+The trading page should clearly state that order calculations use the latest available post-close price, not a live market execution price.
 
-## 8. 多周期 K 线 API
+## 8. Multi-Interval Candles API
 
-### 8.1 统一接口
+### 8.1 Unified Endpoint
 
-接口支持日、周、月三个周期：
+The API supports daily, weekly, and monthly intervals:
 
 ```http
 GET /api/stocks/{id}/candles?interval=DAILY&limit=120
@@ -443,19 +443,19 @@ GET /api/stocks/{id}/candles?interval=WEEKLY&limit=52
 GET /api/stocks/{id}/candles?interval=MONTHLY&limit=60
 ```
 
-`interval` 省略时默认 `DAILY`。`limit` 省略时按周期使用默认值：
+If `interval` is omitted, the default is `DAILY`. If `limit` is omitted, use interval-specific defaults:
 
-| interval | 默认根数 | 最大根数 |
+| interval | default count | max count |
 |---|---:|---:|
 | `DAILY` | 120 | 260 |
 | `WEEKLY` | 52 | 104 |
 | `MONTHLY` | 60 | 120 |
 
-接口只读取数据库，不在用户请求过程中访问 Yahoo。
+The API reads only from the database and never calls Yahoo during a user request.
 
-旧的鼠标悬停七日折线图及其 `GET /api/stocks/{id}/prices` 接口不再保留。
+The old hover-based seven-day line chart and its `GET /api/stocks/{id}/prices` endpoint are no longer retained.
 
-### 8.2 响应示例
+### 8.2 Example Response
 
 ```json
 {
@@ -478,9 +478,9 @@ GET /api/stocks/{id}/candles?interval=MONTHLY&limit=60
 }
 ```
 
-### 8.3 新增 DTO 和 Service
+### 8.3 New DTOs and Services
 
-新增：
+Add:
 
 - `dto/CandleResponse.java`
 - `dto/CandleSeriesResponse.java`
@@ -488,236 +488,236 @@ GET /api/stocks/{id}/candles?interval=MONTHLY&limit=60
 - `service/CandleService.java`
 - `service/CandleServiceImpl.java`
 
-修改：
+Modify:
 
 - `controller/StockController.java`
 
-### 8.4 多周期转换位置
+### 8.4 Where to Aggregate Intervals
 
-推荐在 Java Service 中聚合，而不是在 MySQL 中通过复杂 SQL 计算。
+Aggregation should happen in a Java service instead of complex MySQL SQL.
 
-原因：
+Reasons:
 
-- 第一交易日和最后交易日更容易准确选择；
-- 更容易处理节假日；
-- 更容易处理不完整交易周；
-- 聚合逻辑可以通过纯单元测试验证；
-- 日、周、月可以共用统一的累加器和返回模型。
+- selecting the first and last trading day is easier to do correctly
+- holidays are easier to handle
+- incomplete trading weeks are easier to handle
+- aggregation logic can be verified with pure unit tests
+- daily, weekly, and monthly intervals can share the same accumulator and response model
 
-转换规则：
+Conversion rules:
 
-- `DAILY`：每日行情直接映射为 `CandleResponse`；
-- `WEEKLY`：按周一作为周期键聚合；
-- `MONTHLY`：按自然月第一天作为周期键聚合；
-- 结果统一按日期升序返回，并裁剪到最近 `limit` 根；
-- 当前未结束周和月可以返回，通过顶层 `asOf` 告知数据截至日期。
+- `DAILY`: map each daily price directly to `CandleResponse`
+- `WEEKLY`: aggregate using Monday as the interval key
+- `MONTHLY`: aggregate by the first day of each calendar month
+- return results sorted by date ascending and trim to the latest `limit` entries
+- the current unfinished week or month may still be returned, with the top-level `asOf` indicating the cutoff date
 
-## 9. 前端设计
+## 9. Frontend Design
 
-### 9.1 改动目标
+### 9.1 Change Target
 
-实际运行前端为：
+The actual runtime frontend is:
 
 - `src/main/resources/static/index.html`
 
-本次不同时修改仓库根目录下尚未接入构建链的 React/TypeScript 源码，避免形成两套未同步实现。
+This change does not modify the React/TypeScript sources at the repo root that are not part of the current build pipeline, avoiding divergence between two unsynchronized implementations.
 
-### 9.2 交互
+### 9.2 Interaction
 
-投资操作页面的两张表都支持点击：
+Both tables on the trades page support row clicks:
 
-- “我的持仓”；
-- “市场标的”。
+- My Holdings
+- Market Securities
 
-点击股票行后：
+When a stock row is clicked:
 
-1. 打开 K 线弹窗或右侧抽屉；
-2. 显示股票代码、名称、当前周期和数据截至日期；
-3. 顶部显示“日线｜周线｜月线”Tab，默认选中日线；
-4. 显示 loading 并请求对应周期的 candles API；
-5. 使用 Canvas 绘制 K 线；
-6. 鼠标悬浮在 K 线上显示该周期详细 Tooltip；
-7. 支持关闭、切换股票和切换周期；
-8. 请求失败时在弹窗内显示错误，不影响页面其他功能。
+1. Open a candlestick modal or right-side drawer.
+2. Show the stock symbol, name, selected interval, and data cutoff date.
+3. Show `Daily | Weekly | Monthly` tabs at the top, defaulting to Daily.
+4. Show a loading state and request the candles API for the selected interval.
+5. Draw the candlestick chart with Canvas.
+6. Show a detailed tooltip for the hovered candle.
+7. Support close, stock switching, and interval switching.
+8. Show request errors inside the modal without affecting the rest of the page.
 
-交易按钮必须阻止事件冒泡：
+Trading buttons must stop event propagation:
 
 ```text
 Buy/Sell button click -> stopPropagation
 ```
 
-否则点击买卖按钮时会同时打开 K 线。
+Otherwise clicking Buy or Sell would also open the candlestick view.
 
-### 9.3 图表实现
+### 9.3 Chart Implementation
 
-当前实现使用原生 Canvas 绘制 K 线，不增加第三方 K 线库或 CDN 依赖。
+The current implementation uses native Canvas to draw candlesticks and does not add a third-party charting library or CDN dependency.
 
-周期切换沿用同一套 Canvas 绘制逻辑。Tooltip 使用 Canvas 横坐标命中对应 K 线，并通过图表容器内的绝对定位 DOM 展示详细数据。这样既能保持绘制性能，也便于控制 Tooltip 的内容和边界。
+Interval switching should reuse the same Canvas rendering flow. The tooltip should locate the corresponding candle from the Canvas X coordinate and show a detailed absolutely positioned DOM tooltip inside the chart container. This keeps rendering fast while preserving full control over tooltip content and edge handling.
 
-### 9.4 前端状态
+### 9.4 Frontend State
 
-建议增加：
+Recommended additions:
 
-- 当前选中股票；
-- 当前周期，打开弹窗时重置为 `DAILY`；
-- K 线数据；
-- loading；
-- error；
-- 当前 Canvas 布局信息，用于鼠标命中；
-- 当前请求控制器。
+- current selected stock
+- current interval, reset to `DAILY` when the modal opens
+- candle data
+- loading
+- error
+- current Canvas layout info for mouse hit testing
+- current request controller
 
-切换股票、切换周期或关闭弹窗时应：
+When switching stock, switching interval, or closing the modal:
 
-- 取消未完成请求；
-- 清空旧图表和 Tooltip；
-- 清空旧错误；
-- 防止较慢的旧请求覆盖新股票或新周期数据。
+- cancel any unfinished request
+- clear the old chart and tooltip
+- clear the old error
+- prevent slower old requests from overwriting newer stock or interval state
 
 ### 9.5 Tooltip
 
-Tooltip 展示：
+The tooltip should show:
 
-- 日期或周期；
-- 开盘、最高、最低、收盘；
-- 复权收盘价；
-- 相对开盘价的涨跌额和涨跌幅；
-- 成交量。
+- date or interval label
+- open, high, low, close
+- adjusted close
+- absolute and percentage change relative to the open
+- volume
 
-鼠标离开绘图区、切换周期、调整窗口大小或关闭弹窗时隐藏 Tooltip。Tooltip 在图表边缘应自动换向，避免超出弹窗。
+Hide the tooltip when the mouse leaves the plotting area, when switching interval, resizing the window, or closing the modal. The tooltip should automatically flip away from chart edges to stay inside the modal.
 
-## 10. 错误处理与降级
+## 10. Error Handling and Degradation
 
-### 10.1 Yahoo 请求失败
+### 10.1 Yahoo Request Failures
 
-- 每只股票单独捕获异常；
-- 最多进行有限次数重试；
-- 使用指数退避；
-- 不删除数据库中的旧行情；
-- 日志记录 symbol、日期范围和错误类别；
-- 不记录 Cookie、Token 或其他敏感数据。
+- catch exceptions per stock
+- retry only a limited number of times
+- use exponential backoff
+- never delete historical prices already stored in the database
+- log the symbol, date range, and failure category
+- never log cookies, tokens, or other sensitive data
 
-### 10.2 数据过期
+### 10.2 Stale Data
 
-最新行情距离当前日期过久时：
+If the latest price is too old relative to the current date:
 
-- 股票列表展示“数据截至 YYYY-MM-DD”；
-- 返回 `stale = true`；
-- 组合总览仍可使用最后已知价格，但应显示数据可能过期；
-- 是否禁止交易作为产品决策，第一版建议先警告而不是阻断。
+- the stock list should show `Data as of YYYY-MM-DD`
+- return `stale = true`
+- the overview may still use the last known price, but should indicate the data may be stale
+- whether trading is blocked is a product decision; the recommended first version warns instead of blocking
 
-### 10.3 无历史数据
+### 10.3 No Historical Data
 
-- candles API 返回空 candles 或明确的 404/业务错误；
-- 前端显示“暂无历史行情”；
-- 不静默生成模拟 K 线。
+- the candles API returns an empty list or a clear 404/business error
+- the frontend shows `No historical market data`
+- never silently generate simulated candles
 
-### 10.4 CASH 标的
+### 10.4 CASH Instruments
 
-- USD、USDMONEY 不请求 Yahoo；
-- 当前价格保持 1；
-- 点击 CASH 标的时可以隐藏 K 线入口，或显示“不适用”。
+- USD and USDMONEY do not request Yahoo
+- current price stays fixed at 1
+- clicking a CASH instrument can hide the candlestick entry point or show `Not applicable`
 
-第一版建议不为 CASH 标的绑定 K 线点击事件。
+The recommended first version is not to bind candlestick click behavior to CASH rows.
 
-## 11. 测试策略
+## 11. Test Strategy
 
-### 11.1 Provider 测试
+### 11.1 Provider Tests
 
-- Yahoo HistoricalQuote 到内部模型的字段转换；
-- 时区转换；
-- 空字段和无效 OHLC；
-- Yahoo 返回空列表；
-- Yahoo 抛出 IOException。
+- field mapping from Yahoo `HistoricalQuote` to the internal model
+- timezone conversion
+- null fields and invalid OHLC values
+- Yahoo returning an empty list
+- Yahoo throwing `IOException`
 
-由于 Yahoo API 入口是静态方法，应把静态调用限制在 Adapter 内，业务测试只 mock `MarketDataProvider`。
+Because the Yahoo API entry point is a static method, keep that static call isolated inside the adapter and mock only `MarketDataProvider` in business-level tests.
 
-### 11.2 同步服务测试
+### 11.2 Sync Service Tests
 
-- 空表触发历史回填；
-- 增量同步使用回退窗口；
-- 18:30 ET 之前过滤当天日线；
-- 18:30 ET 之后允许写入当天完整日线；
-- 盘中启动不会保存当天临时行情；
-- 盘后主同步和盘前补偿同步调用同一幂等服务；
-- 周末和休市日没有新数据时正常完成；
-- 提前收盘日仍能在盘后任务中写入完整日线；
-- JVM 运行在 Asia/Shanghai 时仍按纽约市场日期计算；
-- 上海已跨日、纽约未跨日时不会写错 trade_date；
-- 美国夏令时切换前后调度语义保持不变；
-- 行情同步不改变 V1 transaction.createdAt 的原有语义；
-- CASH 标的不调用 Provider；
-- 重复数据走 upsert；
-- 单只股票失败不影响其他股票；
-- 无效数据不会入库。
+- empty table triggers historical backfill
+- incremental sync uses the lookback overlap window
+- same-day bars are filtered out before 18:30 ET
+- completed same-day bars are allowed after 18:30 ET
+- intraday startup does not save a temporary same-day bar
+- post-close and pre-market jobs both invoke the same idempotent service
+- weekends and market holidays with no new data still complete successfully
+- early-close days still persist complete daily bars in the post-close job
+- when the JVM runs in `Asia/Shanghai`, trading dates are still calculated using New York market dates
+- when Shanghai is on the next day but New York is not, `trade_date` is still correct
+- DST transitions do not alter scheduling semantics
+- price sync does not change the existing semantics of V1 `transaction.createdAt`
+- CASH instruments never call the provider
+- duplicate data goes through upsert
+- one stock failure does not affect the others
+- invalid data never reaches the database
 
-### 11.3 多周期 K 线测试
+### 11.3 Multi-Interval Candle Tests
 
-- 日行情直接映射且结果按日期升序；
-- 正常五个交易日；
-- 周一休市；
-- 周五休市；
-- 只有一个交易日；
-- 跨年周；
-- 当前不完整周；
-- 周成交量求和；
-- 跨月数据正确分组；
-- 月线开高低收和成交量计算正确；
-- 当前不完整月；
-- 结果按日期升序。
+- daily prices map directly and return in ascending date order
+- normal five-trading-day week
+- Monday holiday
+- Friday holiday
+- week with only one trading day
+- week crossing the year boundary
+- current incomplete week
+- weekly volume is summed correctly
+- cross-month data is grouped correctly
+- monthly OHLC and volume are computed correctly
+- current incomplete month
+- results are returned in ascending date order
 
-### 11.4 Controller 测试
+### 11.4 Controller Tests
 
-- 不传 interval 时默认返回 120 根日 K；
-- 正常返回周 K 和月 K；
-- 股票不存在；
-- interval 不支持；
-- 各周期 limit 越界；
-- 无历史数据；
-- Service 异常的错误响应。
+- omitting `interval` returns 120 daily candles by default
+- weekly and monthly candles return normally
+- stock does not exist
+- unsupported interval
+- `limit` outside the allowed bounds
+- no historical data
+- service exception error response
 
-### 11.5 Repository/集成测试
+### 11.5 Repository / Integration Tests
 
-优先验证：
+Prioritize verification of:
 
-- 唯一约束；
-- MySQL upsert；
-- 最新两条行情查询顺序；
-- 日期范围查询；
-- 批量写入。
+- unique constraint
+- MySQL upsert behavior
+- order of the latest-two-price query
+- date-range queries
+- batch writes
 
-如果时间允许，使用 Testcontainers MySQL。若暂不引入 Testcontainers，至少在开发数据库执行一次端到端同步验证。
+If time permits, use Testcontainers MySQL. If not, at least run one end-to-end sync verification against a development database.
 
-### 11.6 前端验收
+### 11.6 Frontend Acceptance
 
-- 点击持仓行打开正确股票；
-- 点击市场标的行打开正确股票；
-- 点击买卖按钮不会打开 K 线；
-- 打开弹窗默认选中日线；
-- 日线、周线、月线 Tab 可正常切换；
-- 快速切换周期不会展示旧请求数据；
-- 鼠标悬浮 K 线时 Tooltip 数据与接口一致；
-- Tooltip 在图表边缘不会溢出；
-- 快速切换股票不会展示错乱数据；
-- 空数据、请求失败和加载状态正确；
-- 图表在不同窗口宽度下正常；
-- 关闭弹窗后无残留图表或事件。
+- clicking a holding row opens the correct stock
+- clicking a market row opens the correct stock
+- clicking Buy or Sell does not open the candlestick view
+- the modal defaults to Daily
+- Daily, Weekly, and Monthly tabs switch correctly
+- fast interval switching does not show stale request data
+- hovered tooltip data matches the API response
+- the tooltip does not overflow at chart edges
+- fast stock switching does not show mismatched data
+- empty data, request failures, and loading states render correctly
+- the chart works across different window widths
+- closing the modal leaves no stale chart or event handlers behind
 
-## 12. 预计文件改动
+## 12. Expected File Changes
 
-### 12.1 修改现有文件
+### 12.1 Existing Files to Modify
 
-- `pom.xml`：确认 Yahoo 依赖；按测试策略决定是否增加 Testcontainers。
-- `src/main/java/com/portfolio/PortfolioApplication.java`：启用调度，或改为新增独立配置类。
-- `src/main/java/com/portfolio/controller/StockController.java`：增加 candles API。
-- `src/main/java/com/portfolio/service/PriceService.java`：视需要扩展数据日期/来源能力。
-- `src/main/java/com/portfolio/service/SimulatedPriceService.java`：限制到 demo/test profile。
-- `src/main/java/com/portfolio/dto/StockInfoResponse.java`：增加价格日期、来源和 stale。
-- `src/main/resources/schema.sql`：增加日行情表。
-- `src/main/resources/application.properties`：增加非敏感同步配置。
-- `src/main/resources/static/index.html`：增加行点击、K 线弹窗和图表渲染。
-- `README.md`：补充行情同步、初始化和运行说明。
+- `pom.xml`: confirm Yahoo dependency and decide whether to add Testcontainers based on the test strategy
+- `src/main/java/com/portfolio/PortfolioApplication.java`: enable scheduling or add a separate configuration class
+- `src/main/java/com/portfolio/controller/StockController.java`: add the candles API
+- `src/main/java/com/portfolio/service/PriceService.java`: extend as needed for data date/source support
+- `src/main/java/com/portfolio/service/SimulatedPriceService.java`: limit usage to the `demo` and `test` profiles
+- `src/main/java/com/portfolio/dto/StockInfoResponse.java`: add price date, source, and stale
+- `src/main/resources/schema.sql`: add the daily market data table
+- `src/main/resources/application.properties`: add non-sensitive sync settings
+- `src/main/resources/static/index.html`: add row-click behavior, candlestick modal, and chart rendering
+- `README.md`: add market data sync, initialization, and run instructions
 
-### 12.2 新增文件
+### 12.2 New Files to Add
 
 - `src/main/java/com/portfolio/model/MarketPriceDaily.java`
 - `src/main/java/com/portfolio/repository/MarketPriceRepository.java`
@@ -733,150 +733,149 @@ Tooltip 展示：
 - `src/main/java/com/portfolio/scheduler/MarketDataScheduler.java`
 - `src/main/java/com/portfolio/dto/CandleResponse.java`
 - `src/main/java/com/portfolio/dto/CandleSeriesResponse.java`
-- 对应的测试文件
+- corresponding test files
 
-## 13. 分阶段实施计划
+## 13. Phased Implementation Plan
 
-### 阶段 0：Yahoo 可用性验证
+### Phase 0: Yahoo Availability Validation
 
-- 使用 AAPL 和 AGG 获取最近一年 DAILY 数据；
-- 验证 OHLCV 字段、交易日期和请求稳定性；
-- 确认当前网络环境能访问 Yahoo；
-- 记录失败类型和平均响应时间。
+- Fetch one year of DAILY data for AAPL and AGG
+- Verify OHLCV fields, trading dates, and request stability
+- Confirm the current network environment can reach Yahoo
+- Record failure types and average response times
 
-交付结果：决定继续使用现有 YahooFinanceAPI，还是更换 Provider 实现。
+Deliverable: decide whether to continue with the existing YahooFinanceAPI or switch to another provider implementation.
 
-### 阶段 1：日行情入库
+### Phase 1: Daily Price Persistence
 
-- 新增数据库表；
-- 实现模型、Repository 和 Provider；
-- 实现历史回填和幂等 upsert；
-- 完成核心单元测试。
+- Add the database table
+- Implement the model, repository, and provider
+- Implement historical backfill and idempotent upsert
+- Complete core unit tests
 
-交付结果：数据库中至少有 18 个非 CASH 标的最近 12 至 18 个月日线。
+Deliverable: the database contains the latest 12 to 18 months of daily prices for at least 18 non-CASH instruments.
 
-### 阶段 2：数据库价格接管
+### Phase 2: Database Price Takeover
 
-- 新增 DatabasePriceService；
-- 股票列表、持仓、组合总览读取数据库价格；
-- 增加价格日期、来源和过期提示；
-- 保留 demo profile 下的模拟行情。
+- Read database prices for the stock list, holdings, and overview
+- Add price date, source, and stale indicators
+- Keep simulated prices under the `demo` profile
 
-交付结果：V1 原有功能使用同一份真实盘后价格。
+Deliverable: all original V1 features use one consistent set of real post-close prices.
 
-### 阶段 3：多周期 K 线 API
+### Phase 3: Multi-Interval Candles API
 
-- 实现日线映射、周聚合和月聚合；
-- 实现 candles API；
-- 完成聚合和 Controller 测试。
+- Implement daily mapping, weekly aggregation, and monthly aggregation
+- Implement the candles API
+- Complete aggregation and controller tests
 
-交付结果：接口可统一返回日、周、月 K 线，并支持周期独立默认值和上限。
+Deliverable: the API returns daily, weekly, and monthly candles through one endpoint with interval-specific defaults and limits.
 
-### 阶段 4：前端多周期 K 线交互
+### Phase 4: Frontend Multi-Interval Candle Interaction
 
-- 使用原生 Canvas 绘制 K 线；
-- 增加弹窗、周期 Tab 和 Tooltip；
-- 股票行绑定点击；
-- 处理按钮冒泡、加载、错误、股票切换、周期切换和请求取消。
+- Draw candlesticks with native Canvas
+- Add the modal, interval tabs, and tooltip
+- Bind stock row clicks
+- Handle button bubbling, loading, errors, stock switching, interval switching, and request cancellation
 
-交付结果：投资操作页面点击股票默认查看日 K，可切换周 K、月 K，并可悬浮查看详细数据。
+Deliverable: clicking a stock on the trades page opens daily candles by default, with weekly/monthly switching and hover details.
 
-### 阶段 5：定时任务与文档
+### Phase 5: Scheduled Jobs and Documentation
 
-- 启用纽约时间 18:30 的盘后主同步；
-- 启用纽约时间 08:00 的盘前补偿同步；
-- 实现完整日线截止时间过滤；
-- 验证周末、休市日、提前收盘日和盘中启动行为；
-- 验证应用运行在上海时区时仍使用正确的纽约市场日期；
-- 确认没有修改 JVM、Jackson 或 MySQL 全局时区；
-- 增加配置项；
-- 完成手动端到端测试；
-- 更新 README 和演示说明。
+- Enable the 18:30 New York post-close primary sync
+- Enable the 08:00 New York pre-market reconciliation sync
+- Implement complete daily-bar cutoff filtering
+- Verify behavior on weekends, holidays, early-close days, and intraday startup
+- Verify correct New York market dates even when the app runs in the Shanghai timezone
+- Confirm there are no changes to the global JVM, Jackson, or MySQL timezone
+- Add configuration keys
+- Complete manual end-to-end testing
+- Update the README and demo notes
 
-交付结果：系统可在盘后写入完整日线，在下一交易日盘前自动补漏，并清楚显示行情截至时间。
+Deliverable: the system writes complete daily bars after market close, backfills gaps automatically before the next market open, and clearly shows the data cutoff time.
 
-## 14. 验收标准
+## 14. Acceptance Criteria
 
-### 14.1 数据验收
+### 14.1 Data Acceptance
 
-- 至少 18 个非 CASH 标的完成历史回填；
-- 同一股票同一日期不存在重复数据；
-- 连续执行同步不会增加重复记录；
-- 最新行情日期符合最近可用交易日；
-- 纽约时间 18:30 前不会写入当天盘中日线；
-- 盘后主同步正常时，当天完整日线能够在 18:30 ET 后入库；
-- 盘前补偿同步能够补齐前一次失败或遗漏的数据；
-- 周末、休市日不生成占位行情且任务不报业务错误；
-- OHLCV 数据与 Yahoo 页面抽样对比合理；
-- Yahoo 单只股票失败不影响其他标的。
+- At least 18 non-CASH instruments complete historical backfill
+- No duplicate rows exist for the same stock and trading date
+- Repeated syncs do not increase duplicate records
+- The latest price date matches the latest available trading day
+- Before 18:30 New York time, the current day's intraday bar is never written as a daily record
+- When the post-close primary sync succeeds, the completed same-day daily bar is stored after 18:30 ET
+- The pre-market reconciliation sync can fill data missed by a prior failure or skipped run
+- Weekends and market holidays do not generate placeholder rows and do not cause business-level task failures
+- OHLCV values are reasonably consistent with spot checks against Yahoo pages
+- A Yahoo failure for one stock does not affect other instruments
 
-### 14.2 API 验收
+### 14.2 API Acceptance
 
-- candles API 默认返回指定股票最近 120 根日线；
-- interval 可切换 DAILY、WEEKLY、MONTHLY；
-- limit 使用周期默认值并执行上限校验；
-- 每根 K 线满足 OHLC 聚合规则；
-- 日期按升序返回；
-- 股票不存在、无数据和非法参数有明确响应；
-- API 不在请求过程中访问 Yahoo。
+- the candles API returns the latest 120 daily candles for a stock by default
+- `interval` switches correctly between `DAILY`, `WEEKLY`, and `MONTHLY`
+- `limit` uses interval defaults and enforces caps
+- each candle respects the OHLC aggregation rules
+- dates are returned in ascending order
+- missing stock, missing data, and invalid parameters return explicit responses
+- the API never calls Yahoo during a request
 
-### 14.3 前端验收
+### 14.3 Frontend Acceptance
 
-- 点击股票行可打开正确 K 线且默认显示日线；
-- 日线、周线和月线 Tab 切换正常；
-- 悬浮任意 K 线可显示对应周期详细 Tooltip；
-- 买入和卖出按钮行为不受影响；
-- 数据截至日期可见；
-- 请求失败时页面不会崩溃；
-- 关闭和切换股票不会出现旧图表残留；
-- CASH 标的不会错误展示股票 K 线。
+- clicking a stock row opens the correct candlestick view with Daily as the default
+- Daily, Weekly, and Monthly tabs switch correctly
+- hovering any candle shows the corresponding tooltip data
+- Buy and Sell behavior remains unchanged
+- the data cutoff date is visible
+- request failures do not crash the page
+- closing or switching stock does not leave stale charts behind
+- CASH instruments do not incorrectly show stock candlesticks
 
-### 14.4 回归验收
+### 14.4 Regression Acceptance
 
-- 现有 17 个测试继续通过；
-- 组合总览、持仓列表和交易仍可使用；
-- 买入现金不足、卖出持仓不足等规则保持不变；
-- 不修改默认组合 `portfolio_id = 1` 的现有行为。
+- the existing 17 tests continue to pass
+- the portfolio overview, holdings list, and trading features remain usable
+- rules such as insufficient cash for buy and insufficient holdings for sell remain unchanged
+- the existing behavior of the default `portfolio_id = 1` portfolio is preserved
 
-## 15. 风险与应对
+## 15. Risks and Mitigations
 
-| 风险 | 影响 | 应对 |
+| Risk | Impact | Mitigation |
 |---|---|---|
-| Yahoo 接口非官方且可能变化 | 同步失败 | Provider 隔离、保留旧数据、有限重试、支持替换数据源 |
-| 请求频率受限 | 部分标的失败 | 小批量调用、每天盘后和盘前各一次、重叠窗口、避免前端直连 |
-| 应用停机错过任务 | 行情缺口 | 盘前补偿，并从最后日期回退 7 至 10 天同步 |
-| 盘中数据被误写为正式日线 | 估值和 K 线不稳定 | 使用纽约时区和 18:30 截止时间，只接受完整交易日 |
-| 节假日没有新行情 | 误判任务失败 | 无新记录视为正常情况 |
-| 时区转换错误 | 日期错位、周线错误 | 固定使用 `America/New_York` |
-| 修改全局时区影响 V1 | 交易和创建时间语义变化 | 纽约时区只局部用于 scheduler、Clock 和行情日期，禁止修改全局时区 |
-| 模拟和真实数据混用 | 用户误解 | 禁止静默回退，响应携带 source/asOf/stale |
-| Canvas 命中坐标在缩放后偏移 | Tooltip 对应错误 K 线 | 保存逻辑绘图区尺寸，并按实际 Canvas 缩放比例换算鼠标坐标 |
-| 多实例重复执行 | 重复请求 Yahoo | V1 依靠数据库 upsert；多实例阶段再增加分布式锁 |
+| Yahoo is unofficial and may change | sync failure | isolate the provider, preserve old data, use limited retries, support provider replacement |
+| request rate limits | some instruments fail | use small batch calls, run only after close and before open, use overlap windows, avoid frontend direct calls |
+| application downtime misses jobs | data gaps | pre-market reconciliation plus 7 to 10 day lookback sync |
+| intraday data written as finalized daily bars | unstable valuation and candles | use New York time and 18:30 cutoff, accept completed trading days only |
+| holidays produce no new prices | false task-failure signals | treat no new records as normal |
+| timezone conversion errors | date shifts and wrong weekly grouping | always use `America/New_York` |
+| changing global timezones breaks V1 | altered transaction and creation-time semantics | scope New York time only to scheduler, clock, and market dates; never change global timezone |
+| simulated and real prices get mixed | user confusion | forbid silent fallback and include source/asOf/stale in responses |
+| Canvas hit testing drifts after scaling | tooltip maps to the wrong candle | store logical plot size and convert mouse coordinates using the real Canvas scale |
+| multi-instance duplicate execution | repeated Yahoo requests | rely on database upsert in V1; add distributed locking later if needed |
 
-## 16. 待确认决策
+## 16. Decisions Still to Confirm
 
-实施前需要团队确认：
+Before implementation, the team should confirm:
 
-1. 当前未结束周和月是否显示；
-2. 行情过期时只警告还是禁止买卖；
-3. K 线使用原始 OHLC 还是复权后的 OHLC；
-4. 首次历史回填由启动时自动触发，还是通过显式命令执行；
-5. 是否在本阶段引入 Testcontainers MySQL。
+1. Whether the current unfinished week and month should be displayed
+2. Whether stale market data should only warn or also block trading
+3. Whether candles should use raw OHLC or adjusted OHLC
+4. Whether initial historical backfill should run automatically on startup or only via an explicit command
+5. Whether Testcontainers MySQL should be introduced in this phase
 
-建议的第一版选择：
+Recommended first-version choices:
 
-- 默认显示最近 120 根日线；周线默认 52 根，月线默认 60 根；
-- 显示当前不完整周和月，并显示 `asOf`；
-- 行情过期只警告，不阻断交易；
-- 删除旧悬停图及其七日价格接口；
-- 展示原始 OHLC，同时保存 adjusted close；
-- 通过显式配置触发首次回填；
-- 时间允许则引入 Testcontainers，否则完成一次开发库端到端验证。
+- default to the latest 120 daily candles, 52 weekly candles, and 60 monthly candles
+- show the current incomplete week and month together with `asOf`
+- warn on stale data but do not block trading
+- remove the old hover chart and seven-day price endpoint
+- display raw OHLC while still storing adjusted close
+- trigger initial backfill through explicit configuration
+- if time allows, add Testcontainers; otherwise complete one development-database end-to-end verification
 
-## 17. 外部参考
+## 17. External References
 
-- YahooFinanceAPI 项目说明：<https://github.com/sstrickx/yahoofinance-api>
-- YahooFinanceAPI Releases：<https://github.com/sstrickx/yahoofinance-api/releases>
-- Yahoo 接口变化相关 Issue：<https://github.com/sstrickx/yahoofinance-api/issues/209>
-- NYSE 交易时间和休市日历：<https://www.nyse.com/trade/hours-calendars>
-- Spring Scheduling：<https://docs.spring.io/spring-framework/reference/integration/scheduling.html>
+- YahooFinanceAPI project: <https://github.com/sstrickx/yahoofinance-api>
+- YahooFinanceAPI releases: <https://github.com/sstrickx/yahoofinance-api/releases>
+- Yahoo interface change issue: <https://github.com/sstrickx/yahoofinance-api/issues/209>
+- NYSE trading hours and holiday calendar: <https://www.nyse.com/trade/hours-calendars>
+- Spring Scheduling: <https://docs.spring.io/spring-framework/reference/integration/scheduling.html>

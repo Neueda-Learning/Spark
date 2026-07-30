@@ -9,7 +9,7 @@ public interface TransactionRepository {
     List<Transaction> findByPortfolioId(Long portfolioId);
     
     /**
-     * 查询某只股票在指定日期之前（含）的所有交易记录，按时间升序
+     * Returns all transactions for a stock on or before the specified date, ordered by time ascending.
      */
     List<Transaction> findByPortfolioIdAndStockIdBeforeDate(Long portfolioId, Long stockId, LocalDate date);
 }

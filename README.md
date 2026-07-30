@@ -1,18 +1,21 @@
 # Spark Portfolio Manager
 
-Spring Boot + MySQL 投资组合演示项目。生产默认从数据库读取 Yahoo Finance
-盘后日行情，`demo`/`test` profile 使用确定性的模拟行情。前端由 Spring Boot
-直接提供，包含组合总览、投资操作、K 线图和 AI 投资助手。
+Spring Boot + MySQL portfolio demo project. In production, the application reads
+post-close daily Yahoo Finance market data from the database. The `demo` and `test`
+profiles use deterministic simulated prices. The frontend is served directly by
+Spring Boot and includes a portfolio dashboard, trading page, candlestick charts,
+and an AI investment assistant.
 
-## 运行要求
+## Requirements
 
 - JDK 21
 - Maven 3.8+
 - MySQL 8.0+
 
-## 配置
+## Configuration
 
-应用会读取项目根目录下可选的 `.env` 文件，也可以直接使用环境变量：
+The application reads an optional `.env` file from the project root. You can also
+provide the same values through environment variables:
 
 ```properties
 SPRING_DATASOURCE_URL=jdbc:mysql://localhost:3306/portfoliodb?useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
@@ -25,84 +28,91 @@ AI_MODEL=qwen-plus
 AI_API_KEY=your-api-key
 ```
 
-`.env` 已被 Git 忽略。不要将数据库密码或 AI API Key 提交到仓库。
+`.env` is already ignored by Git. Do not commit database passwords or AI API keys.
 
-## 启动
+## Start
 
 ```bash
 mvn spring-boot:run
 ```
 
-启动后访问 <http://localhost:8080>。
+Then open <http://localhost:8080>.
 
-## 初始化数据库行情
+## Initialize Market Data
 
-首次运行前请先确保 MySQL 可用，并通过环境或本地配置提供数据库连接信息。
-日行情表由 `src/main/resources/schema.sql` 自动创建。
+Before the first run, make sure MySQL is available and that the database connection
+settings are provided through environment variables or local configuration.
+The daily market data table is created automatically by `src/main/resources/schema.sql`.
 
-首次历史回填默认开启。新库或历史覆盖不足时会补齐最近 60 个月行情；已有完整
-历史时只同步最近 10 天的重叠区间。
+Historical backfill on first startup is enabled by default. When the database is new
+or history coverage is incomplete, the app fills the most recent 60 months of data.
+When history is already complete, it only syncs the most recent 10-day overlap window.
 
-如需临时关闭启动回填：
+To disable startup backfill temporarily:
 
 ```bash
 mvn spring-boot:run \
   -Dspring-boot.run.arguments=--market-data.backfill-on-startup=false
 ```
 
-回填过程按股票隔离失败，并通过 `(stock_id, trade_date)` 唯一键幂等更新。
-正常运行时，应用会在纽约时间工作日 18:30 同步盘后日线，并在 08:00
-执行补偿同步。
+Backfill isolates failures by stock and performs idempotent updates through the
+unique key `(stock_id, trade_date)`. During normal operation, the application syncs
+post-close daily bars at 18:30 New York time on trading weekdays, plus a reconciliation
+sync at 08:00.
 
-## 初始化演示组合
+## Initialize Demo Portfolio
 
-新库会以 100,000 USD 创建包含股票、债券和现金的演示组合。六笔买入使用
-2025-07-01 的 Yahoo 收盘价：
+A new database is seeded with a 100,000 USD demo portfolio containing stocks, bond
+ETFs, and cash. The six initial buys use Yahoo closing prices from 2025-07-01:
 
-- 股票：AAPL 45 股、MSFT 35 股、PG 80 股、XOM 70 股
-- 债券 ETF：AGG 170 股、BND 200 股
-- 初始投入：78,580.35 USD
-- 初始现金：21,419.65 USD
+- Stocks: AAPL 45 shares, MSFT 35 shares, PG 80 shares, XOM 70 shares
+- Bond ETFs: AGG 170 shares, BND 200 shares
+- Initial invested capital: 78,580.35 USD
+- Initial cash: 21,419.65 USD
 
-按 2026-07-29 的种子行情及首次总览请求处理完历史分红后，资产配置约为
-股票 49.3%、债券 29.7%、现金 21.0%。初始化还包含经过发行方页面与 Yahoo
-事件交叉核对的 AAPL、AGG 和 PG 分红记录，用于同时展示已到账和待到账分红。
-`data.sql` 自带所有持仓最近 8 个共同交易日的行情，因此 Yahoo 历史回填完成前
-也能生成 7 天组合收益。
+Using the seeded prices as of 2026-07-29 and the first overview request after
+historical dividends are processed, the initial allocation is approximately
+49.3% stocks, 29.7% bonds, and 21.0% cash. Initialization also includes verified
+dividend records for AAPL, AGG, and PG cross-checked against issuer pages and Yahoo
+events so the app can show both paid and pending dividends. `data.sql` ships with the
+latest 8 common trading days of prices for all seeded positions, which allows the app
+to generate 7-day portfolio performance before Yahoo backfill finishes.
 
-## 演示模式
+## Demo Mode
 
-无需真实行情时可启用模拟价格：
+If you do not need real market data, run with simulated prices:
 
 ```bash
 mvn spring-boot:run -Dspring-boot.run.profiles=demo
 ```
 
-## 周 K API
+## Weekly Candles API
 
 ```http
 GET /api/stocks/{id}/candles?interval=WEEKLY&limit=52
 ```
 
-投资操作页面中点击非 CASH 标的行会打开周 K 弹窗。买入和卖出仍使用数据库中
-最新可用的盘后收盘价，不代表实时成交价。
+Clicking a non-CASH instrument row on the trades page opens the weekly candlestick
+modal. Buy and sell operations still use the latest available post-close price stored
+in the database, not a real-time execution price.
 
-## AI 投资助手
+## AI Investment Assistant
 
-助手支持普通和流式响应：
+The assistant supports both standard and streaming responses:
 
 ```http
 POST /api/portfolio/ai-assistant/chat
 POST /api/portfolio/ai-assistant/chat/stream
 ```
 
-默认使用系统内部行情作为上下文。如需让助手直接查询 Yahoo Finance，可设置：
+By default, the assistant uses internal system market data as context. To allow it to
+query Yahoo Finance directly, set:
 
 ```properties
 AI_MARKET_DATA_MODE=yahoo
 ```
 
-## 验证
+## Verification
 
 ```bash
 mvn test

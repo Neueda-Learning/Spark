@@ -27,8 +27,8 @@ public class StockController {
     }
 
     /**
-     * GET /api/stocks — 获取所有可投资标的（含当前价格和涨跌幅）
-     * 前端页面2使用：上部分标记已持有，下部分标记未持有
+     * GET /api/stocks - returns all investable instruments with current price and change percent.
+     * Used by the frontend trades page: top rows are held positions, lower rows are not held.
      */
     @GetMapping
     public List<StockInfoResponse> getAllStocks() {
@@ -36,7 +36,7 @@ public class StockController {
     }
 
     /**
-     * GET /api/stocks/{id} — 获取单个标的详情
+     * GET /api/stocks/{id} - returns a single instrument detail.
      */
     @GetMapping("/{id}")
     public ResponseEntity<Stock> getStockById(@PathVariable Long id) {

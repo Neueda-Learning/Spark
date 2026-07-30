@@ -14,20 +14,20 @@ public class SimulatedDividendService implements DividendService {
     @Override
     public BigDecimal getTaxRate(String symbol) {
         return switch (symbol) {
-            // 美股 — 合格股息 15%（持有>60天，联邦税率）
+            // US equities - qualified dividends taxed at 15% when holding requirements are met.
             case "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA",
                 "META", "JPM", "JNJ", "V", "PG", "XOM", "UNH", "MA"
                 -> new BigDecimal("0.15");
 
-            // 债券ETF — 利息收入，按普通所得税 22%
+            // Bond ETFs - interest income taxed as ordinary income at 22%.
             case "AGG", "BND", "TLT", "LQD"
                 -> new BigDecimal("0.22");
 
-            // 现金类 — 利息收入 22%
+            // Cash-like instruments - interest income taxed at 22%.
             case "USD", "USDMONEY"
                 -> new BigDecimal("0.22");
 
-            // 默认
+            // Default
             default -> BigDecimal.ZERO;
         };
     }

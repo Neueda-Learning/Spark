@@ -81,14 +81,14 @@ public class PortfolioServiceImpl implements PortfolioService {
         List<Holding> holdings = holdingRepository.findByPortfolioId(portfolioId);
         LocalDate today = LocalDate.now();
 
-        // ======== 1. 处理分红：计算 + 派息日到账 ========
+        // ======== 1. Process dividends: accrual plus payment-date settlement ========
         processDividends(portfolioId, today);
 
-        // 读取 portfolio
+        // Load portfolio
          Portfolio portfolio = portfolioRepository.findById(portfolioId)
                 .orElseThrow(() -> new IllegalArgumentException("Portfolio not found: " + portfolioId));
 
-        // ======== 2. 计算持仓市值 ========
+        // ======== 2. Calculate holding market value ========
         BigDecimal holdingsValue = BigDecimal.ZERO;
         BigDecimal totalCost = BigDecimal.ZERO;
         Map<String, BigDecimal> allocationByType = new LinkedHashMap<>();
@@ -113,16 +113,16 @@ public class PortfolioServiceImpl implements PortfolioService {
                 ? stockProfit.multiply(BigDecimal.valueOf(100)).divide(totalCost, 2, RoundingMode.HALF_UP)
                 : BigDecimal.ZERO;
 
-        // ======== 3. 统计分红 ========
-        // 已到账分红：所有 status = 'paid' 的 net_amount 总和
+        // ======== 3. Aggregate dividends ========
+        // Paid dividends: sum all net_amount values where status = 'paid'.
         BigDecimal totalDividendPaid = userDividendRepository
                 .sumPaidByPortfolioIdAndDateRange(portfolioId, LocalDate.of(2025, 1, 1), today);
 
-        // 待到账分红：所有 status = 'pending' 的 net_amount 总和
+        // Pending dividends: sum all net_amount values where status = 'pending'.
         BigDecimal totalDividendPending = userDividendRepository
                 .sumPendingByPortfolioId(portfolioId);
 
-        // ======== 4. 资产配置 ========
+        // ======== 4. Build asset allocation ========
         List<PortfolioOverviewResponse.AssetAllocation> allocation = new ArrayList<>();
         for (Map.Entry<String, BigDecimal> entry : allocationByType.entrySet()) {
             BigDecimal percentage = totalValue.compareTo(BigDecimal.ZERO) > 0
@@ -157,31 +157,31 @@ public class PortfolioServiceImpl implements PortfolioService {
     }
 
     /**
-     * 处理分红：
-     * 1. 遍历所有 dividend_history 记录（ex_date <= today）
-     * 2. 对每条记录，计算 ex_date 前一天的持仓数量
-     * 3. 如果持仓 > 0，创建 user_dividend 记录（如不存在）
-     * 4. 如果 pay_date <= today 且 status = 'pending'，将分红加到现金余额，标记为 paid
+     * Processes dividends.
+     * 1. Iterate through all dividend_history records where ex_date <= today.
+     * 2. For each record, calculate holdings as of the day before ex_date.
+     * 3. If holdings > 0, create a user_dividend record when one does not already exist.
+     * 4. If pay_date <= today and status = 'pending', add the dividend to cash balance and mark it as paid.
      */
     private void processDividends(Long portfolioId, LocalDate today) {
         List<DividendHistory> allDividends = dividendHistoryRepository.findUpToDate(today);
 
         for (DividendHistory dh : allDividends) {
-            // 查找 stock id
+            // Look up the stock id.
             Optional<Stock> stockOpt = stockRepository.findBySymbol(dh.symbol());
             if (stockOpt.isEmpty()) continue;
             Stock stock = stockOpt.get();
 
-            // 检查是否已有该分红记录
+            // Skip records that already exist for this portfolio/symbol/ex-date.
             Optional<UserDividend> existing = userDividendRepository
                     .findByPortfolioIdAndSymbolAndExDate(portfolioId, dh.symbol(), dh.exDate());
             if (existing.isPresent()) continue;
 
-            // 计算除息日持仓数量（ex_date 前一天收盘持有）
+            // Calculate shares held at the close of the day before the ex-dividend date.
             BigDecimal sharesOnExDate = getHoldingOnDate(portfolioId, stock.id(), dh.exDate().minusDays(1));
             if (sharesOnExDate.compareTo(BigDecimal.ZERO) <= 0) continue;
 
-            // 创建 user_dividend 记录
+            // Create the user_dividend record.
             int sharesHeld = sharesOnExDate.setScale(0, RoundingMode.DOWN).intValue();
             BigDecimal grossAmount = dh.dividendPerShare()
                     .multiply(BigDecimal.valueOf(sharesHeld))
@@ -202,9 +202,9 @@ public class PortfolioServiceImpl implements PortfolioService {
                     grossAmount,
                     taxRate,
                     netAmount,
-                    "pending",          // status
-                    null,               // paidAt
-                    null                // createdAt
+                                        "pending",         // status
+                                        null,               // paidAt
+                                        null                // createdAt
             );
             try {
                 userDividendRepository.save(userDividend);
@@ -215,7 +215,7 @@ public class PortfolioServiceImpl implements PortfolioService {
             }
         }
 
-        // 处理派息日到账：将 pending 且 pay_date <= today 的分红加到现金余额
+                // Settle pending dividends whose pay date has arrived by adding them to cash balance.
         List<UserDividend> pendingToPay = userDividendRepository.findPendingDividends(portfolioId, today);
         if (!pendingToPay.isEmpty()) {
             Portfolio portfolio = portfolioRepository.findById(portfolioId).orElseThrow();
@@ -232,10 +232,11 @@ public class PortfolioServiceImpl implements PortfolioService {
         }
     }
 
-    /**
-     * 计算某只股票在指定日期（含）之前的持仓数量。
-     * 通过遍历该日期之前（含）的所有交易记录，累加买入、减去卖出得到。
-     */
+        /**
+         * Calculates holdings for a stock on or before the specified date.
+         * The result is derived by iterating through all transactions up to that date,
+         * adding buys and subtracting sells.
+         */
     private BigDecimal getHoldingOnDate(Long portfolioId, Long stockId, LocalDate date) {
         List<Transaction> transactions = transactionRepository.findByPortfolioIdAndStockIdBeforeDate(portfolioId, stockId, date);
 
@@ -272,7 +273,7 @@ public class PortfolioServiceImpl implements PortfolioService {
                     ? profit.multiply(BigDecimal.valueOf(100)).divide(cost, 2, RoundingMode.HALF_UP)
                     : BigDecimal.ZERO;
 
-            // 该持仓的已到账分红：从 user_dividend 表查
+            // Paid dividends for this holding are read from the user_dividend table.
             BigDecimal holdingDividend = calculateHoldingDividend(portfolioId, stock.symbol());
 
             responses.add(new HoldingResponse(
@@ -293,9 +294,9 @@ public class PortfolioServiceImpl implements PortfolioService {
         return responses;
     }
 
-    /**
-     * 计算某个持仓标的的累计已到账分红。
-     */
+        /**
+         * Calculates the cumulative paid dividends for a holding symbol.
+         */
     private BigDecimal calculateHoldingDividend(Long portfolioId, String symbol) {
         List<UserDividend> dividends = userDividendRepository
                 .findByPortfolioIdAndDateRange(portfolioId, LocalDate.of(2025, 1, 1), LocalDate.now());
@@ -454,24 +455,24 @@ public class PortfolioServiceImpl implements PortfolioService {
     @Override
     @org.springframework.transaction.annotation.Transactional
     public DepositResponse deposit(Long portfolioId, BigDecimal amount) {
-        // 1. 校验金额
+                // 1. Validate the amount.
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Deposit amount must be positive");
         }
 
-        // 2. 获取当前余额
+                // 2. Load the current balance.
         Portfolio portfolio = portfolioRepository.findById(portfolioId)
                 .orElseThrow(() -> new IllegalArgumentException("Portfolio not found: " + portfolioId));
         BigDecimal previousBalance = portfolio.cashBalance();
 
-        // 3. 计算新余额并更新
+                // 3. Compute the new balance and persist it.
         BigDecimal newBalance = previousBalance.add(amount).setScale(2, RoundingMode.HALF_UP);
         portfolioRepository.updateCashBalance(portfolioId, newBalance);
 
         log.info("Deposit: portfolioId={}, amount={}, previous={}, new={}",
                 portfolioId, amount, previousBalance, newBalance);
 
-        // 4. 返回结果
+        // 4. Return the response.
         return new DepositResponse(
                 true,
                 "Deposit successful",

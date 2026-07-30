@@ -22,8 +22,8 @@ public class PortfolioController {
     }
 
     /**
-     * GET /api/portfolio/overview — 组合总览
-     * 前端页面1：总价值、总盈利、收益率、饼状图（资产分配）
+     * GET /api/portfolio/overview - portfolio overview.
+     * Frontend dashboard: total value, total profit, return rate, and asset allocation chart.
      */
     @GetMapping("/overview")
     public PortfolioOverviewResponse getOverview() {
@@ -31,8 +31,8 @@ public class PortfolioController {
     }
 
     /**
-     * GET /api/portfolio/weekly-performance — 过去7天收益变化
-     * 前端页面1：横轴日期、纵轴条形图(收益金额)+折线图(收益率)
+     * GET /api/portfolio/weekly-performance - performance changes over the last 7 days.
+     * Frontend dashboard: date on the X axis, profit bars, and return-rate line.
      */
     @GetMapping("/weekly-performance")
     public List<WeeklyPerformanceResponse> getWeeklyPerformance() {
@@ -40,8 +40,8 @@ public class PortfolioController {
     }
 
     /**
-     * GET /api/portfolio/holdings — 当前持仓列表
-     * 前端页面2上部分：代码、名字、持有数量、平均价格、当前盈利
+     * GET /api/portfolio/holdings - current holdings list.
+     * Frontend trades page top section: symbol, name, quantity, average price, and current profit.
      */
     @GetMapping("/holdings")
     public List<HoldingResponse> getHoldings() {
@@ -49,8 +49,8 @@ public class PortfolioController {
     }
 
     /**
-     * POST /api/portfolio/deposit — 银行充值
-     * 将指定金额存入组合现金余额
+     * POST /api/portfolio/deposit - bank deposit.
+     * Adds the specified amount to the portfolio cash balance.
      */
     @PostMapping("/deposit")
     public DepositResponse deposit(@Valid @RequestBody DepositRequest request) {
