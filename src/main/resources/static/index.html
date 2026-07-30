@@ -972,6 +972,14 @@ function fmtPct(n) {
     return (n >= 0 ? '+' : '') + Number(n).toFixed(2) + '%';
 }
 function pnlClass(n) { return n >= 0 ? 'positive' : 'negative'; }
+function assetTypeDisplayName(assetType, fallbackLabel) {
+    const labelMap = {
+        'STOCK': 'Stock',
+        'BOND': 'Bond',
+        'CASH': 'Cash'
+    };
+    return labelMap[assetType] || fallbackLabel || assetType || 'Other';
+}
 function escapeHtml(value) {
     const text = value === null || value === undefined ? '' : String(value);
     return text.replace(/[&<>"']/g, char => ({
@@ -1091,7 +1099,7 @@ function renderOverviewInsights() {
 function renderPieChart() {
     const d = overviewData;
     const colorMap = { 'STOCK': '#3b82f6', 'BOND': '#22c55e', 'CASH': '#f97316' };
-    const labels = (d.allocation || []).map(a => a.label || a.assetType);
+    const labels = (d.allocation || []).map(a => assetTypeDisplayName(a.assetType, a.label));
     const values = (d.allocation || []).map(a => a.value || 0);
     const colors = (d.allocation || []).map(a => colorMap[a.assetType] || '#94a3b8');
     const total = values.reduce((sum, value) => sum + Number(value || 0), 0);
